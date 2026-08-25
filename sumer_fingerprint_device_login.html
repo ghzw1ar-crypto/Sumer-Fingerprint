@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>مطعم سومر | دخول جهاز البصمة</title>
+<style>
+:root{--bg:#0d1218;--p:#151c24;--line:#29333e;--gold:#d9a441;--gold2:#f0c56b;--text:#f5f7fa;--muted:#9ba7b4;--green:#39d276;--red:#ff5d5d}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 15%,#1b222b 0,#0d1218 48%);color:var(--text);font-family:Tahoma,Arial,sans-serif;display:grid;place-items:center;padding:20px}
+.card{width:min(460px,100%);background:linear-gradient(145deg,var(--p),#111820);border:1px solid var(--line);border-radius:24px;padding:28px;box-shadow:0 20px 70px #0008}
+.logo{text-align:center;font-size:28px;font-weight:bold;color:var(--gold2);margin-bottom:6px}
+.sub{text-align:center;color:var(--muted);font-size:13px;margin-bottom:28px}
+h2{margin:0 0 18px;text-align:center}
+label{display:block;color:var(--muted);font-size:13px;margin:14px 0 7px}
+input{width:100%;padding:15px;border-radius:13px;border:1px solid var(--line);background:#0d141b;color:#fff;font-size:17px;outline:none}
+input:focus{border-color:var(--gold)}
+button{width:100%;margin-top:20px;padding:16px;border-radius:13px;border:1px solid #d9a441;background:#8b681f;color:#fff;font-size:17px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}
+.status{margin-top:15px;min-height:44px;padding:13px;border-radius:12px;background:#10171f;color:var(--muted);text-align:center;font-size:13px;display:none}
+.ok{display:block;border:1px solid #2fae64;color:#6cf09b;background:#14271c}
+.err{display:block;border:1px solid #a84040;color:#ff8585;background:#291619}
+.device{display:none;margin-top:20px;text-align:center;padding:16px;border:1px solid var(--line);border-radius:15px;background:#10171f}
+.device b{display:block;font-size:18px;color:var(--gold2);margin-bottom:5px}
+.small{color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="logo">𒀭 مطعم سومر</div>
+  <div class="sub">نظام جهاز البصمة</div>
+  <h2>تسجيل دخول الجهاز</h2>
+
+  <label for="deviceCode">كود الجهاز</label>
+  <input id="deviceCode" value="DEVICE-001" autocomplete="off" autocapitalize="characters">
+
+  <label for="pin">PIN الجهاز</label>
+  <input id="pin" type="password" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="أدخل PIN الجهاز">
+
+  <button id="loginBtn" onclick="deviceLogin()">دخول الجهاز</button>
+  <div id="status" class="status"></div>
+  <div id="deviceInfo" class="device"></div>
+</main>
+
+<script>
+const URL="https://glbugvsorxtzixgexdak.supabase.co";
+const KEY="sb_publishable_8iv3CIQ3MaQ6E9oPgK6N8A_KTYGp-V6";
+const RPC=URL+"/rest/v1/rpc/";
+const STORAGE="sumer_fingerprint_device_session_v1";
+
+function setStatus(message,type=""){
+  const e=document.getElementById("status");
+  e.textContent=message;
+  e.className="status "+type;
+}
+function saveSession(data){
+  localStorage.setItem(STORAGE,JSON.stringify({
+    token:data.session_token,
+    expires_at:data.expires_at,
+    device_id:data.id,
+    device_code:data.device_code,
+    device_name:data.device_name
+  }));
+}
+function getStored(){
+  try{return JSON.parse(localStorage.getItem(STORAGE)||"null")}catch{return null}
+}
+async function rpc(name,body){
+  const r=await fetch(RPC+name,{
+    method:"POST",
+    headers:{
+      apikey:KEY,
+      Authorization:"Bearer "+KEY,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify(body)
+  });
+  const text=await r.text();
+  let data=null;try{data=text?JSON.parse(text):null}catch{}
+  if(!r.ok)throw new Error(data?.message||data?.hint||data?.details||text||("HTTP "+r.status));
+  return data;
+}
+async function checkExisting(){
+  const s=getStored();
+  if(!s?.token)return;
+  if(s.expires_at && new Date(s.expires_at)<=new Date()){
+    localStorage.removeItem(STORAGE);return;
+  }
+  try{
+    const rows=await rpc("device_session_info",{p_session_token:s.token});
+    if(rows?.length){
+      showDevice(rows[0]);
+      return;
+    }
+  }catch{}
+  localStorage.removeItem(STORAGE);
+}
+function showDevice(d){
+  document.getElementById("deviceInfo").style.display="block";
+  document.getElementById("deviceInfo").innerHTML=
+    "<b>"+(d.device_name||"جهاز البصمة")+"</b><span class='small'>"+(d.device_code||"")+" — الجلسة فعالة</span>";
+  setStatus("تم تسجيل دخول الجهاز بنجاح ✓","ok");
+  setTimeout(()=>location.href="sumer_attendance_device.html",500);
+}
+async function deviceLogin(){
+  const code=document.getElementById("deviceCode").value.trim().toUpperCase();
+  const pin=document.getElementById("pin").value.trim();
+  const btn=document.getElementById("loginBtn");
+  if(!code||!pin){setStatus("أدخل كود الجهاز وPIN","err");return}
+  btn.disabled=true;setStatus("جاري التحقق من الجهاز...");
+  try{
+    const rows=await rpc("device_login",{p_device_code:code,p_pin:pin});
+    const d=rows?.[0];
+    if(!d?.session_token)throw new Error("لم يتم إنشاء جلسة الجهاز");
+    saveSession(d);
+    showDevice(d);
+  }catch(e){
+    setStatus(e.message||"فشل تسجيل دخول الجهاز","err");
+  }finally{btn.disabled=false}
+}
+document.getElementById("pin").addEventListener("keydown",e=>{if(e.key==="Enter")deviceLogin()});
+checkExisting();
+</script>
+</body>
+</html>
