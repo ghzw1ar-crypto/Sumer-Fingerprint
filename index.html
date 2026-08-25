@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>مطعم سومر | التقارير</title>
+<style>
+:root{--bg:#0d1218;--p:#151c24;--line:#29333e;--gold:#d9a441;--gold2:#f0c56b;--text:#f5f7fa;--muted:#9ba7b4;--green:#39d276;--red:#ff5d5d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Tahoma,Arial}.wrap{max-width:1200px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.brand{font-size:23px;font-weight:bold;color:var(--gold2)}.muted{color:var(--muted);font-size:12px}.controls{display:flex;gap:9px}.control{background:var(--p);border:1px solid var(--line);color:white;border-radius:10px;padding:11px}.btn{background:var(--gold);border:0;border-radius:10px;padding:11px 16px;font-weight:bold}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}.card{background:linear-gradient(145deg,var(--p),#121820);border:1px solid var(--line);border-radius:17px;padding:18px}.label{color:var(--muted);font-size:12px}.num{font-size:24px;font-weight:bold;margin-top:8px}.gold{color:var(--gold2)}.green{color:var(--green)}.red{color:var(--red)}.table{margin-top:16px;overflow:auto}.head,.row{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr 1fr;min-width:900px;gap:9px;align-items:center}.head{color:var(--muted);font-size:11px;padding-bottom:12px}.row{border-top:1px solid var(--line);padding:13px 4px;font-size:12px}.badge{padding:5px 8px;border-radius:20px;width:max-content}.ok{background:#153c29;color:#57e18b}.open{background:#3d321b;color:#f0c56b}.empty{text-align:center;padding:35px;color:var(--muted)}@media(max-width:750px){.wrap{padding:14px}.cards{grid-template-columns:1fr 1fr}.top{align-items:flex-start;gap:12px;flex-direction:column}.controls{width:100%;flex-wrap:wrap}.control{flex:1}.btn{width:100%}}
+</style></head>
+<body><div class="wrap">
+<header class="top"><div><div class="brand">𒀭 مطعم سومر</div><h1 style="margin:8px 0 4px">تقارير الحضور</h1><div class="muted">حساب ساعات العمل والأجر بالدينار العراقي</div></div>
+<div class="controls"><input id="date" class="control" type="date"><button class="btn" onclick="load()">تحديث التقرير</button></div></header>
+<section class="cards">
+<div class="card"><div class="label">عدد الموظفين الحاضرين</div><div id="present" class="num green">0</div></div>
+<div class="card"><div class="label">إجمالي ساعات العمل</div><div id="hours" class="num">0</div></div>
+<div class="card"><div class="label">الأجر المستحق</div><div id="pay" class="num gold">0 د.ع</div></div>
+<div class="card"><div class="label">سجلات الدوام</div><div id="records" class="num">0</div></div>
+</section>
+<section class="card table"><div class="head"><span>الموظف</span><span>التاريخ</span><span>الدخول</span><span>الخروج</span><span>مدة العمل</span><span>أجر الساعة</span><span>المستحق</span></div><div id="rows"></div></section>
+</div>
+<script>
+const URL="https://glbugvsorxtzixgexdak.supabase.co",KEY="sb_publishable_8iv3CIQ3MaQ6E9oPgK6N8A_KTYGp-V6",API=URL+"/rest/v1/";
+const HEAD={apikey:KEY,Authorization:"Bearer "+KEY};
+async function api(path){let r=await fetch(API+path,{headers:HEAD});let t=await r.text();let d=t?JSON.parse(t):[];if(!r.ok)throw Error(d.message||t);return d}
+function iraqDate(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Baghdad",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())}
+function time(v){return v?new Date(v).toLocaleTimeString("ar-IQ",{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Baghdad"}):"—"}
+function duration(m){m=Number(m||0);return Math.floor(m/60)+"س "+(m%60)+"د"}
+function money(n){return Math.round(n).toLocaleString("ar-IQ")+" د.ع"}
+function liveMinutes(x){
+  if(x.check_out) return Number(x.worked_minutes||0);
+  if(!x.check_in) return 0;
+  return Math.max(0, Math.floor((Date.now()-new Date(x.check_in).getTime())/60000));
+}
+async function load(){
+ const d=document.getElementById("date").value||iraqDate();document.getElementById("date").value=d;
+ try{
+  const data=await api(`attendance?select=*,employees(full_name,hourly_rate)&work_date=eq.${d}&order=check_in.asc`);
+  present.textContent=new Set(data.map(x=>x.employee_id)).size;records.textContent=data.length;
+  let mins=data.reduce((s,x)=>s+liveMinutes(x),0);hours.textContent=duration(mins);
+  let total=data.reduce((s,x)=>s+(liveMinutes(x)/60)*Number(x.employees?.hourly_rate||0),0);pay.textContent=money(total);
+  rows.innerHTML=data.map(x=>{let m=liveMinutes(x),p=(m/60)*Number(x.employees?.hourly_rate||0);return `<div class="row"><b>${x.employees?.full_name||"—"}</b><span>${x.work_date}</span><span>${time(x.check_in)}</span><span>${time(x.check_out)}</span><span class="badge ${x.check_out?"ok":"open"}">${duration(m)}${x.check_out?"":" • مفتوح"}</span><span>${money(x.employees?.hourly_rate||0)}</span><b class="gold">${money(p)}</b></div>`}).join("")||'<div class="empty">لا توجد سجلات حضور لهذا اليوم</div>';
+ }catch(e){rows.innerHTML='<div class="empty">حدث خطأ في تحميل التقرير: '+e.message+'</div>'}
+}
+date.value=iraqDate();load();
+setInterval(()=>{ if(document.visibilityState!=="hidden") load(); },60000);
+</script></body></html>
