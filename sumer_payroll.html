@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>مطعم سومر | الرواتب والأجور</title>
+<style>
+:root{--bg:#0d1218;--p:#151c24;--line:#29333e;--gold:#d9a441;--gold2:#f0c56b;--text:#f5f7fa;--muted:#9ba7b4;--green:#39d276;--red:#ff5d5d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Tahoma,Arial,sans-serif}
+.wrap{max-width:1200px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:20px}
+.brand{color:var(--gold2);font-size:23px;font-weight:bold}.muted{color:var(--muted);font-size:12px}
+.controls{display:flex;gap:8px;flex-wrap:wrap}.control,.btn{background:#10161d;color:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 13px}.btn{background:var(--gold);color:#111;border:0;font-weight:bold;cursor:pointer}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}.card{background:linear-gradient(145deg,var(--p),#121820);border:1px solid var(--line);border-radius:17px;padding:18px}
+.label{color:var(--muted);font-size:12px}.num{font-size:24px;font-weight:bold;margin-top:8px}.gold{color:var(--gold2)}.green{color:var(--green)}
+.table{margin-top:16px;overflow:auto}.head,.row{display:grid;grid-template-columns:1.5fr .8fr .9fr .9fr .9fr 1fr;min-width:850px;gap:9px;align-items:center}
+.head{color:var(--muted);font-size:11px;padding:0 4px 12px}.row{border-top:1px solid var(--line);padding:13px 4px;font-size:12px}
+.badge{padding:5px 8px;border-radius:20px;width:max-content}.ok{background:#153c29;color:#57e18b}.open{background:#3d321b;color:#f0c56b}.empty{text-align:center;padding:35px;color:var(--muted)}
+.notice{margin-top:14px;padding:13px;border-radius:12px;background:#211b11;border:1px solid #57451f;color:var(--gold2);font-size:11px}
+@media(max-width:750px){.wrap{padding:14px}.top{align-items:flex-start;flex-direction:column}.cards{grid-template-columns:1fr 1fr}.controls{width:100%}.control,.btn{flex:1}.row,.head{min-width:850px}}
+@media print{body{background:#fff!important;color:#111!important}.controls{display:none}.card{background:#fff!important;color:#111!important;border:1px solid #ddd}.muted,.label,.head{color:#555!important}.gold,.green{color:#111!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+<div><div class="brand">𒀭 مطعم سومر</div><h1 style="margin:8px 0 4px">الرواتب والأجور</h1><div class="muted">حساب مستحقات الموظفين حسب ساعات العمل الفعلية — الدينار العراقي</div></div>
+<div class="controls"><input id="date" class="control" type="date"><button class="btn" onclick="load()">تحديث</button><button class="btn" onclick="window.print()">🖨️ طباعة / PDF</button></div>
+</header>
+
+<section class="cards">
+<div class="card"><div class="label">الموظفون</div><div id="people" class="num">0</div></div>
+<div class="card"><div class="label">إجمالي ساعات العمل</div><div id="hours" class="num">0</div></div>
+<div class="card"><div class="label">إجمالي الأجور</div><div id="pay" class="num gold">0 د.ع</div></div>
+<div class="card"><div class="label">السجلات</div><div id="records" class="num">0</div></div>
+</section>
+
+<div class="notice">يتم احتساب الأجر من ساعات العمل المسجلة فقط، ولا يُحتسب أي أجر بعد نهاية دوام الموظف المحددة في صفحة الموظفين.</div>
+
+<section class="card table">
+<div style="margin-bottom:15px"><b>مطعم سومر — كشف الرواتب اليومي</b><div id="sub" class="muted"></div></div>
+<div class="head"><span>الموظف</span><span>الدوام</span><span>الساعات</span><span>أجر الساعة</span><span>المستحق</span><span>الحالة</span></div>
+<div id="rows"></div>
+</section>
+</div>
+
+<script src="sumer_auth.js"></script>
+<script>
+const URL="https://glbugvsorxtzixgexdak.supabase.co";
+const KEY="sb_publishable_8iv3CIQ3MaQ6E9oPgK6N8A_KTYGp-V6";
+const API=URL+"/rest/v1/",HEAD={apikey:KEY,Authorization:"Bearer "+KEY};
+
+async function api(path){
+ const r=await fetch(API+path,{headers:HEAD});
+ const t=await r.text();let d=t?JSON.parse(t):[];
+ if(!r.ok)throw Error(d.message||t||("HTTP "+r.status));return d;
+}
+function iraqDate(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Baghdad",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())}
+function money(n){return Math.round(Number(n)||0).toLocaleString("ar-IQ")+" د.ع"}
+function minsText(m){m=Math.max(0,Math.round(Number(m)||0));return Math.floor(m/60)+"س "+(m%60)+"د"}
+function shiftEnd(e,checkIn){const d=new Date(checkIn),p=String(e?.shift_end||"15:00:00").split(":").map(Number),s=String(e?.shift_start||"07:00:00").split(":").map(Number);d.setHours(p[0]||0,p[1]||0,p[2]||0,0);if((p[0]*60+(p[1]||0))<=(s[0]*60+(s[1]||0)))d.setDate(d.getDate()+1);return d}
+function liveMinutes(x,e){
+ if(!x.check_in)return 0;
+ const end=x.check_out?new Date(x.check_out):new Date(),cap=shiftEnd(e,x.check_in);
+ return Math.max(0,Math.floor((Math.min(end.getTime(),cap.getTime())-new Date(x.check_in).getTime())/60000));
+}
+function shiftEnd(e,checkIn){
+ const d=new Date(checkIn), parts=String(e?.shift_end||"15:00:00").split(":").map(Number);
+ d.setHours(parts[0]||0,parts[1]||0,parts[2]||0,0);
+ const start=String(e?.shift_start||"07:00:00").split(":").map(Number);
+ if((parts[0]*60+parts[1])<=(start[0]*60+start[1]))d.setDate(d.getDate()+1);
+ return d;
+}
+async function load(){
+ const date=document.getElementById("date").value||iraqDate();document.getElementById("date").value=date;
+ try{
+  const data=await api(`attendance?select=*,employees(full_name,job_title,hourly_rate,shift_start,shift_end)&work_date=eq.${date}&order=check_in.asc`);
+  people.textContent=new Set(data.map(x=>x.employee_id)).size;
+  records.textContent=data.length;
+  let totalM=0,totalP=0;
+  rows.innerHTML=data.map(x=>{
+    const e=x.employees||{},m=liveMinutes(x,e),p=(m/60)*Number(e.hourly_rate||0);
+    totalM+=m;totalP+=p;
+    const start=String(e.shift_start||"07:00:00").slice(0,5),end=String(e.shift_end||"15:00:00").slice(0,5);
+    return `<div class="row"><b>${e.full_name||"—"}</b><span>${start} → ${end}</span><span>${minsText(m)}</span><span>${money(e.hourly_rate||0)}</span><b class="gold">${money(p)}</b><span class="badge ${x.check_out?"ok":"open"}">${x.check_out?"مغلق":"مفتوح"}</span></div>`;
+  }).join("")||'<div class="empty">لا توجد سجلات حضور لهذا اليوم</div>';
+  hours.textContent=minsText(totalM);pay.textContent=money(totalP);
+  sub.textContent="التاريخ: "+date+" — توقيت العراق";
+ }catch(e){
+  rows.innerHTML='<div class="empty">حدث خطأ في تحميل الرواتب: '+e.message+'</div>';
+ }
+}
+date.value=iraqDate();load();
+setInterval(()=>{if(document.visibilityState!=="hidden")load()},60000);
+</script>
+</body></html>
