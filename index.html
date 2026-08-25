@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>مطعم سومر | الموظفين والدوام</title>
+<style>
+:root{--bg:#0d1218;--p:#151c24;--line:#29333e;--gold:#d9a441;--gold2:#f0c56b;--text:#f5f7fa;--muted:#9ba7b4;--green:#39d276;--red:#ff5d5d}
+*{box-sizing:border-box}html,body{min-height:100%;overflow-x:hidden}body{margin:0;background:var(--bg);color:var(--text);font-family:Tahoma,Arial,sans-serif;overflow-y:auto;-webkit-overflow-scrolling:touch}.wrap{max-width:1200px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;gap:15px}.brand{color:var(--gold2);font-size:23px;font-weight:bold}.muted{color:var(--muted);font-size:12px}.btn{background:var(--gold);border:0;border-radius:11px;padding:12px 17px;font-weight:bold;cursor:pointer}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin:20px 0}.card{background:linear-gradient(145deg,var(--p),#121820);border:1px solid var(--line);border-radius:17px;padding:18px}.num{font-size:25px;font-weight:bold;margin-top:8px}.toolbar{display:flex;gap:10px;margin-bottom:14px}.search,select,input{background:#10161d;color:#fff;border:1px solid var(--line);border-radius:10px;padding:11px}.search{flex:1}.table{overflow:auto}.head,.row{display:grid;grid-template-columns:1.5fr 1fr .8fr 1fr 1fr 1fr;min-width:850px;gap:10px;align-items:center}.head{color:var(--muted);font-size:11px;padding:0 8px 12px}.row{border-top:1px solid var(--line);padding:13px 8px;font-size:12px}.person{display:flex;align-items:center;gap:9px}.avatar{width:38px;height:38px;border-radius:50%;background:#303b47;display:grid;place-items:center}.badge{padding:5px 8px;border-radius:20px;width:max-content;background:#153c29;color:#57e18b}.shift{color:var(--gold2);line-height:1.7}.action{background:#202934;color:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer}.modal{position:fixed;inset:0;background:#000b;display:none;place-items:start center;padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch}.modal.show{display:grid}.box{width:min(600px,100%);max-height:calc(100dvh - 32px);overflow-y:auto;-webkit-overflow-scrolling:touch;background:#151c24;border:1px solid #394552;border-radius:18px;padding:22px}.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:grid;gap:6px}.field label{font-size:12px;color:var(--muted)}.full{grid-column:1/-1}.check{display:flex;align-items:center;gap:8px;background:#10161d;border:1px solid var(--line);padding:11px;border-radius:10px}.modal-actions{display:flex;gap:8px;margin-top:18px}.cancel{background:#252d36;color:white;border:1px solid var(--line);border-radius:10px;padding:11px 17px}.toast{position:fixed;bottom:20px;left:20px;background:#1d2a22;border:1px solid #3dcc72;color:#75ed9b;padding:13px 17px;border-radius:12px;display:none}
+@media(max-width:700px){.wrap{padding:14px}.cards{grid-template-columns:1fr 1fr}.top{align-items:flex-start;flex-direction:column}.form{grid-template-columns:1fr}.full{grid-column:auto}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top"><div><div class="brand">𒀭 مطعم سومر</div><h1 style="margin:8px 0">الموظفين والدوام</h1><div class="muted">تحديد ساعات الدوام والأجر لكل موظف بشكل مستقل</div></div><button class="btn" onclick="openM()">＋ إضافة موظف</button></header>
+<section class="cards"><div class="card"><span class="muted">إجمالي الموظفين</span><div id="total" class="num">0</div></div><div class="card"><span class="muted">الموظفون الفعالون</span><div id="active" class="num">0</div></div><div class="card"><span class="muted">الدوام الافتراضي</span><div class="num">07:00 → 15:00</div></div></section>
+<div class="toolbar"><input id="q" class="search" placeholder="ابحث باسم الموظف أو الوظيفة..." oninput="render()"><select id="f" onchange="render()"><option value="all">كل الموظفين</option><option value="active">فعال</option><option value="inactive">غير فعال</option></select></div>
+<section class="card table"><div class="head"><span>الموظف</span><span>الوظيفة</span><span>الرقم</span><span>الدوام</span><span>الأجر/ساعة</span><span>الحالة</span></div><div id="rows"></div></section>
+</div>
+<div id="modal" class="modal"><div class="box"><h2 id="modalTitle">إضافة موظف</h2><div class="form">
+<div class="field"><label>اسم الموظف *</label><input id="name"></div><div class="field"><label>الوظيفة *</label><input id="role"></div>
+<div class="field"><label>رقم الموظف</label><input id="code" placeholder="EMP-001"></div><div class="field"><label>أجر الساعة — د.ع</label><input id="pay" type="number" min="0"></div>
+<div class="field"><label>وقت بداية الدوام</label><input id="start" type="time" value="07:00"></div><div class="field"><label>وقت نهاية الدوام</label><input id="end" type="time" value="15:00"></div>
+<div class="field full"><label>الإغلاق التلقائي</label><label class="check"><input id="auto" type="checkbox" checked> إذا لم يسجل الموظف خروجاً، يغلق النظام دوامه عند نهاية دوامه.</label></div>
+<div class="field full"><label>الحالة</label><select id="status"><option value="true">فعال</option><option value="false">غير فعال</option></select></div>
+</div><div class="modal-actions"><button class="btn" onclick="save()">حفظ</button><button class="cancel" onclick="closeM()">إلغاء</button></div></div></div>
+<div id="toast" class="toast"></div>
+<script>
+const URL="https://glbugvsorxtzixgexdak.supabase.co",KEY="sb_publishable_8iv3CIQ3MaQ6E9oPgK6N8A_KTYGp-V6",API=URL+"/rest/v1/",HEAD={apikey:KEY,Authorization:"Bearer "+KEY,"Content-Type":"application/json"};
+let data=[],editId=null;
+async function api(path,opt={}){let r=await fetch(API+path,{...opt,headers:{...HEAD,...(opt.headers||{})}});let t=await r.text(),d=t?JSON.parse(t):null;if(!r.ok)throw Error(d?.message||t);return d}
+async function load(){try{data=await api("employees?select=id,employee_code,full_name,job_title,hourly_rate,is_active,shift_start,shift_end,auto_checkout&order=full_name.asc");render()}catch(e){rows.innerHTML='<div style="padding:25px;color:#ff7777">تعذر تحميل الموظفين: '+e.message+"</div>"}}
+function render(){let q=document.getElementById("q").value.toLowerCase(),f=document.getElementById("f").value,list=data.filter(x=>(x.full_name+" "+(x.job_title||"")).toLowerCase().includes(q)&&(f=="all"||(x.is_active?"active":"inactive")==f));rows.innerHTML=list.map(x=>`<div class="row"><div class="person"><div class="avatar">${x.full_name[0]}</div><b>${x.full_name}</b></div><span>${x.job_title||"—"}</span><span>${x.employee_code}</span><span class="shift">🕐 ${String(x.shift_start||"07:00:00").slice(0,5)} → ${String(x.shift_end||"15:00:00").slice(0,5)}<br><small>${x.auto_checkout?"إغلاق تلقائي":"يدوي"}</small></span><span>${Number(x.hourly_rate||0).toLocaleString()} د.ع</span><span><span class="badge">${x.is_active?"فعال":"غير فعال"}</span> <button class="action" onclick="edit('${x.id}')">تعديل</button></span></div>`).join("")||'<div style="padding:30px;color:#9ba7b4">لا توجد نتائج</div>';total.textContent=data.length;active.textContent=data.filter(x=>x.is_active).length}
+function openM(){
+ editId=null;
+ document.getElementById("modalTitle").textContent="إضافة موظف";
+ document.getElementById("name").value="";
+ document.getElementById("role").value="";
+ document.getElementById("code").value="";
+ document.getElementById("pay").value="";
+ document.getElementById("start").value="07:00";
+ document.getElementById("end").value="15:00";
+ document.getElementById("auto").checked=true;
+ document.getElementById("status").value="true";
+ document.getElementById("modal").classList.add("show");
+}
+function closeM(){document.getElementById("modal").classList.remove("show")}
+function edit(id){let x=data.find(y=>y.id===id);if(!x)return;editId=id;
+document.getElementById("modalTitle").textContent="تعديل دوام الموظف";
+document.getElementById("name").value=x.full_name;
+document.getElementById("role").value=x.job_title||"";
+document.getElementById("code").value=x.employee_code||"";
+document.getElementById("pay").value=x.hourly_rate||0;
+document.getElementById("start").value=String(x.shift_start||"07:00:00").slice(0,5);
+document.getElementById("end").value=String(x.shift_end||"15:00:00").slice(0,5);
+document.getElementById("auto").checked=x.auto_checkout!==false;
+document.getElementById("status").value=String(x.is_active);
+document.getElementById("modal").classList.add("show")}
+async function save(){
+ const nameEl=document.getElementById("name"), roleEl=document.getElementById("role"), codeEl=document.getElementById("code"), payEl=document.getElementById("pay"), startEl=document.getElementById("start"), endEl=document.getElementById("end"), autoEl=document.getElementById("auto"), statusEl=document.getElementById("status");
+ if(!nameEl.value.trim()||!roleEl.value.trim()){alert("أدخل اسم الموظف والوظيفة");return}
+ if(!startEl.value||!endEl.value){alert("حدد وقت بداية ونهاية الدوام");return}
+ if(startEl.value===endEl.value){alert("وقت البداية والنهاية لا يمكن أن يكونا متساويين");return}
+ const body={full_name:nameEl.value.trim(),job_title:roleEl.value.trim(),employee_code:codeEl.value.trim()||"EMP-"+String(data.length+1).padStart(3,"0"),hourly_rate:Number(payEl.value)||0,shift_start:startEl.value+":00",shift_end:endEl.value+":00",auto_checkout:autoEl.checked,is_active:statusEl.value==="true",updated_at:new Date().toISOString()};
+ try{
+   const button=document.querySelector(".modal-actions .btn"); if(button){button.disabled=true;button.textContent="جاري الحفظ...";}
+   if(editId) await api("employees?id=eq."+encodeURIComponent(editId),{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify(body)});
+   else await api("employees",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(body)});
+   closeM(); await load(); toast(editId?"تم تحديث دوام الموظف ✓":"تمت إضافة الموظف ✓");
+ }catch(e){alert("فشل الحفظ: "+e.message)}
+ finally{const button=document.querySelector(".modal-actions .btn");if(button){button.disabled=false;button.textContent="حفظ";}}
+}
+function toast(m){let e=document.getElementById("toast");e.textContent=m;e.style.display="block";setTimeout(()=>e.style.display="none",2200)}
+load();
+</script></body></html>
