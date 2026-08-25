@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>مطعم سومر | الموظفين والدوام</title>
+<style>
+:root{
+  --bg:#0d1218;--p:#151c24;--p2:#111820;--line:#29333e;
+  --gold:#d9a441;--gold2:#f0c56b;--text:#f5f7fa;--muted:#9ba7b4;
+  --green:#39d276;--red:#ff5d5d;
+}
+*{box-sizing:border-box}
+html,body{min-height:100%;width:100%;overflow-x:hidden}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:Tahoma,Arial,sans-serif;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+button,input,select{font:inherit}
+button{touch-action:manipulation}
+.wrap{width:min(1200px,100%);margin:auto;padding:24px}
+.top{
+  display:flex;justify-content:space-between;align-items:center;
+  gap:15px;margin-bottom:4px
+}
+.brand{color:var(--gold2);font-size:23px;font-weight:bold}
+.muted{color:var(--muted);font-size:12px}
+.btn{
+  background:var(--gold);color:#111;border:0;border-radius:11px;
+  padding:12px 17px;font-weight:bold;cursor:pointer;min-height:44px
+}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin:20px 0}
+.card{
+  background:linear-gradient(145deg,var(--p),#121820);
+  border:1px solid var(--line);border-radius:17px;padding:18px
+}
+.num{font-size:25px;font-weight:bold;margin-top:8px}
+.toolbar{display:flex;gap:10px;margin-bottom:14px}
+.search,select,input{
+  width:100%;min-width:0;background:#10161d;color:#fff;
+  border:1px solid var(--line);border-radius:10px;padding:11px;
+  outline:none
+}
+.search{flex:1}
+.search:focus,input:focus,select:focus{border-color:#526273}
+.table{overflow:auto}
+.head,.row{
+  display:grid;grid-template-columns:1.5fr 1fr .8fr 1fr 1fr 1fr;
+  min-width:850px;gap:10px;align-items:center
+}
+.head{color:var(--muted);font-size:11px;padding:0 8px 12px}
+.row{border-top:1px solid var(--line);padding:13px 8px;font-size:12px}
+.person{display:flex;align-items:center;gap:9px;min-width:0}
+.person b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.avatar{
+  flex:0 0 38px;width:38px;height:38px;border-radius:50%;
+  background:#303b47;display:grid;place-items:center;overflow:hidden
+}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.badge{padding:5px 8px;border-radius:20px;width:max-content;background:#153c29;color:#57e18b}
+.shift{color:var(--gold2);line-height:1.7}
+.action{background:#202934;color:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer}
+.modal{
+  position:fixed;inset:0;background:#000b;display:none;
+  place-items:start center;padding:16px;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;z-index:1000
+}
+.modal.show{display:grid}
+.box{
+  width:min(600px,100%);max-height:calc(100dvh - 32px);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  background:#151c24;border:1px solid #394552;border-radius:18px;
+  padding:22px
+}
+.box h2{margin:0 0 18px;font-size:24px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:grid;gap:6px;min-width:0}
+.field label{font-size:12px;color:var(--muted)}
+.full{grid-column:1/-1}
+.check{
+  display:flex;align-items:center;gap:8px;background:#10161d;
+  border:1px solid var(--line);padding:11px;border-radius:10px;
+  color:var(--text);line-height:1.6
+}
+.check input{width:auto;flex:0 0 auto}
+.modal-actions{display:flex;gap:8px;margin-top:18px}
+.modal-actions .btn{flex:1}
+.cancel{
+  background:#252d36;color:white;border:1px solid var(--line);
+  border-radius:10px;padding:11px 17px;cursor:pointer;min-height:44px;
+  flex:0 0 auto
+}
+.facebox{
+  display:flex;align-items:center;gap:12px;background:#10161d;
+  border:1px solid var(--line);padding:12px;border-radius:12px;
+  min-width:0
+}
+.face-preview{
+  width:72px;height:72px;flex:0 0 72px;border-radius:50%;
+  object-fit:cover;background:#303b47;display:grid;place-items:center;
+  font-size:28px
+}
+.face-info{flex:1;min-width:0}
+.face-info input[type=file]{max-width:100%;padding:8px}
+.toast{
+  position:fixed;bottom:20px;left:20px;right:20px;max-width:420px;
+  margin:auto;background:#1d2a22;border:1px solid #3dcc72;color:#75ed9b;
+  padding:13px 17px;border-radius:12px;display:none;z-index:1100;
+  text-align:center
+}
+@media(max-width:700px){
+  .wrap{padding:14px}
+  .top{align-items:stretch;flex-direction:column}
+  .top .btn{width:100%}
+  .brand{font-size:19px}
+  h1{font-size:25px!important}
+  .cards{grid-template-columns:1fr 1fr;gap:10px}
+  .card{padding:14px}
+  .num{font-size:21px}
+  .toolbar{flex-direction:column}
+  .table{padding:12px}
+  .modal{padding:8px;place-items:start center}
+  .box{
+    width:100%;max-height:calc(100dvh - 16px);
+    border-radius:15px;padding:15px
+  }
+  .box h2{font-size:22px;margin-bottom:14px}
+  .form{grid-template-columns:1fr;gap:11px}
+  .full{grid-column:auto}
+  .facebox{align-items:flex-start}
+  .face-preview{width:64px;height:64px;flex-basis:64px}
+  .modal-actions{position:sticky;bottom:0;background:#151c24;padding-top:10px}
+}
+@media(max-width:430px){
+  .wrap{padding:10px}
+  .cards{grid-template-columns:1fr}
+  .modal{padding:5px}
+  .box{padding:13px;border-radius:13px}
+  .facebox{flex-direction:column}
+  .face-preview{align-self:center}
+  .face-info{width:100%;text-align:center}
+  .face-info input[type=file]{width:100%}
+  .modal-actions{flex-direction:column}
+  .modal-actions .btn,.cancel{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top"><div><div class="brand">𒀭 مطعم سومر</div><h1 style="margin:8px 0">الموظفين والدوام</h1><div class="muted">تحديد ساعات الدوام والأجر لكل موظف بشكل مستقل</div></div><button class="btn" onclick="openM()">＋ إضافة موظف</button></header>
+<section class="cards"><div class="card"><span class="muted">إجمالي الموظفين</span><div id="total" class="num">0</div></div><div class="card"><span class="muted">الموظفون الفعالون</span><div id="active" class="num">0</div></div><div class="card"><span class="muted">الدوام الافتراضي</span><div class="num">07:00 → 15:00</div></div></section>
+<div class="toolbar"><input id="q" class="search" placeholder="ابحث باسم الموظف أو الوظيفة..." oninput="render()"><select id="f" onchange="render()"><option value="all">كل الموظفين</option><option value="active">فعال</option><option value="inactive">غير فعال</option></select></div>
+<section class="card table"><div class="head"><span>الموظف</span><span>الوظيفة</span><span>الرقم</span><span>الدوام</span><span>الأجر/ساعة</span><span>الحالة</span></div><div id="rows"></div></section>
+</div>
+<div id="modal" class="modal"><div class="box"><h2 id="modalTitle">إضافة موظف</h2><div class="form">
+<div class="field"><label>اسم الموظف *</label><input id="name"></div><div class="field"><label>الوظيفة *</label><input id="role"></div>
+<div class="field"><label>رقم الموظف</label><input id="code" placeholder="EMP-001"></div><div class="field"><label>أجر الساعة — د.ع</label><input id="pay" type="number" min="0"></div>
+<div class="field"><label>وقت بداية الدوام</label><input id="start" type="time" value="07:00"></div><div class="field"><label>وقت نهاية الدوام</label><input id="end" type="time" value="15:00"></div>
+<div class="field full"><label>الإغلاق التلقائي</label><label class="check"><input id="auto" type="checkbox" checked> إذا لم يسجل الموظف خروجاً، يغلق النظام دوامه عند نهاية دوامه.</label></div>
+<div class="field full"><label>📸 صورة وجه الموظف</label><div class="facebox"><img id="facePreview" class="face-preview" alt="صورة الوجه" style="display:none"><div id="facePlaceholder" class="face-preview">👤</div><div class="face-info"><div id="faceText" class="muted">أضف صورة واضحة للوجه من الأمام.</div><input id="faceFile" type="file" accept="image/jpeg,image/png,image/webp" style="margin-top:8px"></div></div><div class="muted" style="margin-top:6px">الصورة تحفظ بشكل خاص في Supabase وتبقى مرتبطة بهذا الموظف.</div></div><div class="field full"><label>الحالة</label><select id="status"><option value="true">فعال</option><option value="false">غير فعال</option></select></div>
+</div><div class="modal-actions"><button class="btn" onclick="save()">حفظ</button><button class="cancel" onclick="closeM()">إلغاء</button></div></div></div>
+<div id="toast" class="toast"></div>
+<script src="sumer_auth.js"></script>
+<script>
+const URL="https://glbugvsorxtzixgexdak.supabase.co",KEY="sb_publishable_8iv3CIQ3MaQ6E9oPgK6N8A_KTYGp-V6",API=URL+"/rest/v1/",HEAD={apikey:KEY,Authorization:"Bearer "+KEY,"Content-Type":"application/json"};
+let data=[],editId=null;
+async function api(path,opt={}){let r=await fetch(API+path,{...opt,headers:{...HEAD,...(opt.headers||{})}});let t=await r.text(),d=t?JSON.parse(t):null;if(!r.ok)throw Error(d?.message||t);return d}
+async function load(){try{data=await api("employees?select=id,employee_code,full_name,job_title,hourly_rate,is_active,shift_start,shift_end,auto_checkout,face_photo_path&order=full_name.asc");render()}catch(e){rows.innerHTML='<div style="padding:25px;color:#ff7777">تعذر تحميل الموظفين: '+e.message+"</div>"}}
+function render(){let q=document.getElementById("q").value.toLowerCase(),f=document.getElementById("f").value,list=data.filter(x=>(x.full_name+" "+(x.job_title||"")).toLowerCase().includes(q)&&(f=="all"||(x.is_active?"active":"inactive")==f));rows.innerHTML=list.map(x=>`<div class="row"><div class="person"><div class="avatar">${x.face_photo_path?'<span title="صورة محفوظة">📷</span>':(x.full_name||"؟")[0]}</div><b>${x.full_name}</b></div><span>${x.job_title||"—"}</span><span>${x.employee_code}</span><span class="shift">🕐 ${String(x.shift_start||"07:00:00").slice(0,5)} → ${String(x.shift_end||"15:00:00").slice(0,5)}<br><small>${x.auto_checkout?"إغلاق تلقائي":"يدوي"}</small></span><span>${Number(x.hourly_rate||0).toLocaleString()} د.ع</span><span><span class="badge">${x.is_active?"فعال":"غير فعال"}</span> <button class="action" onclick="edit('${x.id}')">تعديل</button></span></div>`).join("")||'<div style="padding:30px;color:#9ba7b4">لا توجد نتائج</div>';total.textContent=data.length;active.textContent=data.filter(x=>x.is_active).length}
+function openM(){
+ editId=null;
+ document.getElementById("modalTitle").textContent="إضافة موظف";
+ document.getElementById("name").value="";
+ document.getElementById("role").value="";
+ document.getElementById("code").value="";
+ document.getElementById("pay").value="";
+ document.getElementById("start").value="07:00";
+ document.getElementById("end").value="15:00";
+ document.getElementById("auto").checked=true;
+ document.getElementById("status").value="true";
+ document.getElementById("faceFile").value="";document.getElementById("facePreview").style.display="none";document.getElementById("facePlaceholder").style.display="grid";document.getElementById("faceText").textContent="أضف صورة واضحة للوجه من الأمام.";
+ document.getElementById("modal").classList.add("show");
+}
+function closeM(){document.getElementById("modal").classList.remove("show")}
+function edit(id){let x=data.find(y=>y.id===id);if(!x)return;editId=id;
+document.getElementById("modalTitle").textContent="تعديل دوام الموظف";
+document.getElementById("name").value=x.full_name;
+document.getElementById("role").value=x.job_title||"";
+document.getElementById("code").value=x.employee_code||"";
+document.getElementById("pay").value=x.hourly_rate||0;
+document.getElementById("start").value=String(x.shift_start||"07:00:00").slice(0,5);
+document.getElementById("end").value=String(x.shift_end||"15:00:00").slice(0,5);
+document.getElementById("auto").checked=x.auto_checkout!==false;
+document.getElementById("status").value=String(x.is_active);
+document.getElementById("faceFile").value="";document.getElementById("facePreview").style.display="none";document.getElementById("facePlaceholder").style.display="grid";document.getElementById("faceText").textContent=x.face_photo_path?"لديك صورة محفوظة. اختر صورة جديدة لاستبدالها.":"أضف صورة واضحة للوجه من الأمام.";
+document.getElementById("modal").classList.add("show")}
+async function save(){
+ const nameEl=document.getElementById("name"), roleEl=document.getElementById("role"), codeEl=document.getElementById("code"), payEl=document.getElementById("pay"), startEl=document.getElementById("start"), endEl=document.getElementById("end"), autoEl=document.getElementById("auto"), statusEl=document.getElementById("status"), faceFile=document.getElementById("faceFile");
+ if(!nameEl.value.trim()||!roleEl.value.trim()){alert("أدخل اسم الموظف والوظيفة");return}
+ if(Number(payEl.value)<0){alert("أجر الساعة لا يمكن أن يكون سالباً");return}
+ if(!startEl.value||!endEl.value){alert("حدد وقت بداية ونهاية الدوام");return}
+ if(startEl.value===endEl.value){alert("وقت البداية والنهاية لا يمكن أن يكونا متساويين");return}
+ const body={full_name:nameEl.value.trim(),job_title:roleEl.value.trim(),employee_code:codeEl.value.trim()||"EMP-"+Date.now().toString().slice(-6),hourly_rate:Number(payEl.value)||0,shift_start:startEl.value+":00",shift_end:endEl.value+":00",auto_checkout:autoEl.checked,is_active:statusEl.value==="true",updated_at:new Date().toISOString()};
+ try{
+   const button=document.querySelector(".modal-actions .btn");if(button){button.disabled=true;button.textContent="جاري الحفظ...";}
+   let employeeId=editId;
+   if(editId) await api("employees?id=eq."+encodeURIComponent(editId),{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify(body)});
+   else {const created=await api("employees",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(body)});employeeId=created?.[0]?.id;if(!employeeId)throw new Error("تم حفظ الموظف لكن تعذر الحصول على معرفه");}
+   if(faceFile.files&&faceFile.files[0]){
+     const file=faceFile.files[0];
+     if(file.size>50*1024*1024)throw new Error("حجم صورة الوجه يجب ألا يتجاوز 50 ميجابايت");
+     if(!["image/jpeg","image/png","image/webp"].includes(file.type))throw new Error("صيغة الصورة يجب أن تكون JPG أو PNG أو WEBP");
+     const ext=file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg",path=employeeId+"/face."+ext,client=window.sumerSupabase;
+     if(!client)throw new Error("جلسة Supabase غير جاهزة");
+     const {error:upErr}=await client.storage.from("employee-faces").upload(path,file,{contentType:file.type,upsert:true});
+     if(upErr)throw upErr;
+     await api("employees?id=eq."+encodeURIComponent(employeeId),{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({face_photo_path:path,face_photo_updated_at:new Date().toISOString()})});
+   }
+   closeM();await load();toast(editId?"تم تحديث الموظف وصورة الوجه ✓":"تمت إضافة الموظف وصورة الوجه ✓");
+ }catch(e){alert("فشل الحفظ: "+e.message)}
+ finally{const button=document.querySelector(".modal-actions .btn");if(button){button.disabled=false;button.textContent="حفظ";}}
+}
+function toast(m){let e=document.getElementById("toast");e.textContent=m;e.style.display="block";setTimeout(()=>e.style.display="none",2200)}
+document.getElementById("faceFile").addEventListener("change",function(){const file=this.files?.[0];if(!file)return;if(file.size>50*1024*1024){alert("حجم الصورة يجب ألا يتجاوز 50 ميجابايت");this.value="";return}if(!["image/jpeg","image/png","image/webp"].includes(file.type)){alert("الصيغة المسموحة JPG أو PNG أو WEBP");this.value="";return}const url=globalThis.URL.createObjectURL(file);document.getElementById("facePreview").src=url;document.getElementById("facePreview").style.display="block";document.getElementById("facePlaceholder").style.display="none";document.getElementById("faceText").textContent="الصورة جاهزة للحفظ."});
+
+load();
+</script></body></html>
