@@ -1,0 +1,81 @@
+<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>مطعم سومر - الموظفين</title>
+<style>
+body{margin:0;background:#0d1218;color:#f5f5f5;font-family:Tahoma,Arial}.app{display:flex;min-height:100vh}.side{width:230px;background:#10161d;padding:22px;border-left:1px solid #29333e}.logo{font-size:24px;color:#f0c56b;font-weight:bold;padding:12px;border-bottom:1px solid #29333e}.nav{margin-top:20px}.nav div{padding:14px;margin:7px 0;border-radius:12px;color:#c8d0d8}.nav .on{background:#2a251d;color:#f0c56b}.main{flex:1;padding:28px}.top{display:flex;justify-content:space-between;align-items:center}.muted{color:#9ba7b4}.btn{background:#d9a441;border:0;border-radius:11px;padding:12px 18px;font-weight:bold}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0}.card{background:#151c24;border:1px solid #29333e;border-radius:17px;padding:18px}.num{font-size:27px;font-weight:bold;margin-top:8px}.toolbar{display:flex;gap:10px;margin:15px 0}.search,select,input{background:#10161d;color:white;border:1px solid #29333e;border-radius:10px;padding:12px}.search{flex:1}.table{overflow:auto}.head,.row{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr;min-width:760px;gap:10px;align-items:center}.head{color:#9ba7b4;font-size:12px;padding:0 10px 12px}.row{border-top:1px solid #29333e;padding:13px 10px;font-size:13px}.person{display:flex;align-items:center;gap:9px}.avatar{width:36px;height:36px;border-radius:50%;background:#303b47;display:grid;place-items:center}.badge{padding:5px 9px;border-radius:20px;width:max-content;background:#153c29;color:#57e18b}.actions button{background:#202934;color:white;border:1px solid #29333e;border-radius:7px;padding:7px}.del{color:#ff7777!important}.modal{position:fixed;inset:0;background:#0009;display:none;place-items:center}.modal.show{display:grid}.box{background:#151c24;border:1px solid #394552;border-radius:18px;padding:22px;width:min(500px,90%)}.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:grid;gap:6px}.full{grid-column:1/-1}.close{margin-top:15px}@media(max-width:700px){.side{display:none}.main{padding:16px}.stats{grid-template-columns:1fr}.top{gap:10px}.form{grid-template-columns:1fr}}
+</style>
+<div class="app"><aside class="side"><div class="logo">𒀭 مطعم سومر<br><small>إدارة الحضور والانصراف</small></div><div class="nav"><div>▦ لوحة التحكم</div><div>⌁ تسجيل الحضور</div><div class="on">♙ الموظفين</div><div>▥ التقارير</div><div>▤ الرواتب والأجور</div><div>⚙ الإعدادات</div><div>◈ الصلاحيات</div></div></aside>
+<main class="main"><header class="top"><div><h1>إدارة الموظفين</h1><p class="muted">إضافة ومتابعة بيانات موظفي المطعم</p></div><button class="btn" onclick="openM()">＋ إضافة موظف</button></header>
+<section class="stats"><div class="card"><span class="muted">إجمالي الموظفين</span><div class="num" id="total">5</div></div><div class="card"><span class="muted">الموظفون الفعالون</span><div class="num" id="active">5</div></div><div class="card"><span class="muted">متوسط أجر الساعة</span><div class="num">2,500 <small>د.ع</small></div></div></section>
+<div class="toolbar"><input id="q" class="search" placeholder="ابحث باسم الموظف أو الوظيفة..." oninput="render()"><select id="f" onchange="render()"><option value="all">كل الموظفين</option><option value="active">فعال</option><option value="inactive">غير فعال</option></select></div>
+<section class="card table"><div class="head"><span>الموظف</span><span>الوظيفة</span><span>رقم الموظف</span><span>أجر الساعة</span><span>الحالة</span><span>إجراءات</span></div><div id="rows"></div></section></main></div>
+<div id="modal" class="modal"><div class="box"><h2>إضافة موظف جديد</h2><div class="form"><div class="field"><label>اسم الموظف *</label><input id="name"></div><div class="field"><label>الوظيفة *</label><input id="role"></div><div class="field"><label>رقم الموظف</label><input id="num" placeholder="EMP-001"></div><div class="field"><label>أجر الساعة د.ع</label><input id="pay" type="number"></div><div class="field full"><label>الحالة</label><select id="status"><option value="active">فعال</option><option value="inactive">غير فعال</option></select></div></div><button class="btn close" onclick="add()">حفظ الموظف</button> <button class="close" onclick="closeM()">إلغاء</button></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = "https://glbugvsorxtzixgexdak.supabase.co";
+const SUPABASE_KEY = "sb_publishable_8iv3CIQ3MaQ6E9oPgK6N8A_KTYGp-V6";
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let employees = [];
+
+async function loadEmployees(){
+  const { data, error } = await db.from("employees")
+    .select("id,employee_code,full_name,job_title,hourly_rate,daily_rate,is_active")
+    .order("created_at", {ascending:false});
+  if(error){ console.error(error); alert("تعذر تحميل الموظفين: "+error.message); return; }
+  employees = data || [];
+  render();
+}
+
+function render(){
+  const qEl=document.getElementById("q"), fEl=document.getElementById("f");
+  const rowsEl=document.getElementById("rows");
+  if(!rowsEl) return;
+  const q=(qEl?.value||"").toLowerCase(), f=fEl?.value||"all";
+  const list=employees.filter(x =>
+    ((x.full_name||"")+" "+(x.job_title||"")).toLowerCase().includes(q) &&
+    (f==="all" || (x.is_active?"active":"inactive")===f)
+  );
+  rowsEl.innerHTML=list.map(x=>`
+    <div class="row">
+      <div class="person"><div class="avatar">${(x.full_name||"?")[0]}</div>${x.full_name}</div>
+      <span>${x.job_title||"—"}</span>
+      <span>${x.employee_code}</span>
+      <span>${Number(x.hourly_rate||0).toLocaleString()} د.ع</span>
+      <span class="badge">${x.is_active?"فعال":"غير فعال"}</span>
+      <span class="actions"><button onclick="toggleEmployee('${x.id}',${!x.is_active})">${x.is_active?"تعطيل":"تفعيل"}</button></span>
+    </div>`).join("");
+  const total=document.getElementById("total"), active=document.getElementById("active");
+  if(total) total.textContent=employees.length;
+  if(active) active.textContent=employees.filter(x=>x.is_active).length;
+}
+
+function openM(){document.getElementById("modal")?.classList.add("show")}
+function closeM(){document.getElementById("modal")?.classList.remove("show")}
+
+async function add(){
+  const name=document.getElementById("name")?.value.trim();
+  const role=document.getElementById("role")?.value.trim();
+  if(!name || !role){alert("أدخل اسم الموظف والوظيفة");return;}
+  const code=document.getElementById("num")?.value.trim() ||
+    "EMP-"+String(employees.length+1).padStart(3,"0");
+  const pay=Number(document.getElementById("pay")?.value)||0;
+  const status=document.getElementById("status")?.value==="active";
+  const {error}=await db.from("employees").insert({
+    employee_code:code, full_name:name, job_title:role,
+    hourly_rate:pay, daily_rate:0, is_active:status
+  });
+  if(error){alert("فشل حفظ الموظف: "+error.message);return;}
+  ["name","role","num","pay"].forEach(id=>{const e=document.getElementById(id);if(e)e.value=""});
+  closeM();
+  await loadEmployees();
+  alert("تم حفظ الموظف في قاعدة بيانات المنيو ✓");
+}
+
+async function toggleEmployee(id,value){
+  const {error}=await db.from("employees")
+    .update({is_active:value,updated_at:new Date().toISOString()})
+    .eq("id",id);
+  if(error){alert("فشل التعديل: "+error.message);return;}
+  await loadEmployees();
+}
+
+loadEmployees();
+</script></html>
