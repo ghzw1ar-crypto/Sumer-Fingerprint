@@ -46,7 +46,7 @@ button{touch-action:manipulation}
 .search:focus,input:focus,select:focus{border-color:#526273}
 .table{overflow:auto}
 .head,.row{
-  display:grid;grid-template-columns:1.5fr 1fr .8fr 1fr 1fr 1fr;
+  display:grid;grid-template-columns:1.5fr 1fr .8fr 1fr 1fr 1.5fr;
   min-width:850px;gap:10px;align-items:center
 }
 .head{color:var(--muted);font-size:11px;padding:0 8px 12px}
@@ -151,7 +151,7 @@ button{touch-action:manipulation}
 <header class="top"><div><div class="brand">𒀭 مطعم سومر</div><h1 style="margin:8px 0">الموظفين والدوام</h1><div class="muted">تحديد ساعات الدوام والأجر لكل موظف بشكل مستقل</div></div><button class="btn" onclick="openM()">＋ إضافة موظف</button></header>
 <section class="cards"><div class="card"><span class="muted">إجمالي الموظفين</span><div id="total" class="num">0</div></div><div class="card"><span class="muted">الموظفون الفعالون</span><div id="active" class="num">0</div></div><div class="card"><span class="muted">الدوام الافتراضي</span><div class="num">07:00 → 15:00</div></div></section>
 <div class="toolbar"><input id="q" class="search" placeholder="ابحث باسم الموظف أو الوظيفة..." oninput="render()"><select id="f" onchange="render()"><option value="all">كل الموظفين</option><option value="active">فعال</option><option value="inactive">غير فعال</option></select></div>
-<section class="card table"><div class="head"><span>الموظف</span><span>الوظيفة</span><span>الرقم</span><span>الدوام</span><span>الأجر/ساعة</span><span>الحالة</span></div><div id="rows"></div></section>
+<section class="card table"><div class="head"><span>الموظف</span><span>الوظيفة</span><span>الرقم</span><span>الدوام</span><span>الأجر/ساعة</span><span>الحالة والإجراءات</span></div><div id="rows"></div></section>
 </div>
 <div id="modal" class="modal"><div class="box"><h2 id="modalTitle">إضافة موظف</h2><div class="form">
 <div class="field"><label>اسم الموظف *</label><input id="name"></div><div class="field"><label>الوظيفة *</label><input id="role"></div>
@@ -168,7 +168,7 @@ const URL="https://glbugvsorxtzixgexdak.supabase.co",KEY="sb_publishable_8iv3CIQ
 let data=[],editId=null;
 async function api(path,opt={}){let r=await fetch(API+path,{...opt,headers:{...HEAD,...(opt.headers||{})}});let t=await r.text(),d=t?JSON.parse(t):null;if(!r.ok)throw Error(d?.message||t);return d}
 async function load(){try{data=await api("employees?select=id,employee_code,full_name,job_title,hourly_rate,is_active,shift_start,shift_end,auto_checkout,face_photo_path&order=full_name.asc");render()}catch(e){rows.innerHTML='<div style="padding:25px;color:#ff7777">تعذر تحميل الموظفين: '+e.message+"</div>"}}
-function render(){let q=document.getElementById("q").value.toLowerCase(),f=document.getElementById("f").value,list=data.filter(x=>(x.full_name+" "+(x.job_title||"")).toLowerCase().includes(q)&&(f=="all"||(x.is_active?"active":"inactive")==f));rows.innerHTML=list.map(x=>`<div class="row"><div class="person"><div class="avatar">${x.face_photo_path?'<span title="صورة محفوظة">📷</span>':(x.full_name||"؟")[0]}</div><b>${x.full_name}</b></div><span>${x.job_title||"—"}</span><span>${x.employee_code}</span><span class="shift">🕐 ${String(x.shift_start||"07:00:00").slice(0,5)} → ${String(x.shift_end||"15:00:00").slice(0,5)}<br><small>${x.auto_checkout?"إغلاق تلقائي":"يدوي"}</small></span><span>${Number(x.hourly_rate||0).toLocaleString()} د.ع</span><span><span class="badge">${x.is_active?"فعال":"غير فعال"}</span> <button class="action" onclick="edit('${x.id}')">تعديل</button></span></div>`).join("")||'<div style="padding:30px;color:#9ba7b4">لا توجد نتائج</div>';total.textContent=data.length;active.textContent=data.filter(x=>x.is_active).length}
+function render(){let q=document.getElementById("q").value.toLowerCase(),f=document.getElementById("f").value,list=data.filter(x=>(x.full_name+" "+(x.job_title||"")).toLowerCase().includes(q)&&(f=="all"||(x.is_active?"active":"inactive")==f));rows.innerHTML=list.map(x=>`<div class="row"><div class="person"><div class="avatar">${x.face_photo_path?'<span title="صورة محفوظة">📷</span>':(x.full_name||"؟")[0]}</div><b>${x.full_name}</b></div><span>${x.job_title||"—"}</span><span>${x.employee_code}</span><span class="shift">🕐 ${String(x.shift_start||"07:00:00").slice(0,5)} → ${String(x.shift_end||"15:00:00").slice(0,5)}<br><small>${x.auto_checkout?"إغلاق تلقائي":"يدوي"}</small></span><span>${Number(x.hourly_rate||0).toLocaleString()} د.ع</span><span><span class="badge">${x.is_active?"فعال":"غير فعال"}</span> <button class="action" onclick="edit('${x.id}')">✏️ تعديل</button> <button class="action" style="border-color:#7b3030;color:#ff8585" onclick="removeEmployee('${x.id}')">${x.is_active?"🗑️ حذف":"♻️ تفعيل"}</button></span></div>`).join("")||'<div style="padding:30px;color:#9ba7b4">لا توجد نتائج</div>';total.textContent=data.length;active.textContent=data.filter(x=>x.is_active).length}
 function nextEmployeeCode(){
   const used=new Set(data.map(x=>String(x.employee_code||"").trim().toUpperCase()).filter(Boolean));
   let n=1;
@@ -365,6 +365,49 @@ async function save(){
  }catch(e){alert("فشل الحفظ: "+e.message)}
  finally{const button=document.querySelector(".modal-actions .btn");if(button){button.disabled=false;button.textContent="حفظ";}}
 }
+async function removeEmployee(id){
+  const x=data.find(y=>y.id===id);
+  if(!x)return;
+
+  if(!x.is_active){
+    if(!confirm("تفعيل الموظف «"+x.full_name+"» مرة أخرى؟"))return;
+    try{
+      await api("employees?id=eq."+encodeURIComponent(id),{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({is_active:true,updated_at:new Date().toISOString()})
+      });
+      await load();
+      toast("تم تفعيل الموظف ✓");
+    }catch(e){alert("تعذر تفعيل الموظف: "+e.message)}
+    return;
+  }
+
+  if(!confirm("هل تريد حذف/تعطيل الموظف «"+x.full_name+"»؟\n\nإذا كان لديه سجلات حضور، سيُعطّل فقط للحفاظ على السجلات."))return;
+
+  try{
+    const history=await api("attendance?employee_id=eq."+encodeURIComponent(id)+"&select=id&limit=1");
+    if(Array.isArray(history) && history.length>0){
+      await api("employees?id=eq."+encodeURIComponent(id),{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({is_active:false,updated_at:new Date().toISOString()})
+      });
+      await load();
+      toast("لديه سجل حضور — تم تعطيله وحفظ سجلاته ✓");
+      return;
+    }
+
+    if(!confirm("لا توجد سجلات حضور لهذا الموظف.\nهل تريد حذفه نهائياً؟"))return;
+    await api("employees?id=eq."+encodeURIComponent(id),{
+      method:"DELETE",
+      headers:{Prefer:"return=minimal"}
+    });
+    await load();
+    toast("تم حذف الموظف نهائياً ✓");
+  }catch(e){alert("تعذر تنفيذ العملية: "+e.message)}
+}
+
 function toast(m){let e=document.getElementById("toast");e.textContent=m;e.style.display="block";setTimeout(()=>e.style.display="none",2200)}
 document.getElementById("faceFile").addEventListener("change",function(){const file=this.files?.[0];if(!file)return;if(file.size>50*1024*1024){alert("حجم الصورة يجب ألا يتجاوز 50 ميجابايت");this.value="";return}if(!["image/jpeg","image/png","image/webp"].includes(file.type)){alert("الصيغة المسموحة JPG أو PNG أو WEBP");this.value="";return}const url=globalThis.URL.createObjectURL(file);document.getElementById("facePreview").src=url;document.getElementById("facePreview").style.display="block";document.getElementById("facePlaceholder").style.display="none";document.getElementById("faceText").textContent="الصورة جاهزة للحفظ."});
 
