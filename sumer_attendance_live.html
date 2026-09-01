@@ -93,7 +93,7 @@ async function closeFinishedShifts(){
         const mins=cappedMinutes(e,row.check_in,end);
         await api("attendance?id=eq."+encodeURIComponent(row.id),{
           method:"PATCH",headers:{"Prefer":"return=minimal"},
-          body:JSON.stringify({check_out:end.toISOString(),worked_minutes:mins,note:"خروج تلقائي عند انتهاء الدوام",updated_at:new Date().toISOString()})
+          body:JSON.stringify({check_out:end.toISOString(),note:"خروج تلقائي عند انتهاء الدوام",updated_at:new Date().toISOString()})
         });
       }
     }
@@ -134,7 +134,7 @@ async function checkOut(){
   const e=employees.find(x=>x.id===id),now=new Date(),end=e?.auto_checkout?shiftEndFor(e,open.check_in):now;
   const checkout=new Date(Math.min(now.getTime(),end.getTime())),mins=cappedMinutes(e||{},open.check_in,checkout);
   try{
-    await api("attendance?id=eq."+encodeURIComponent(open.id),{method:"PATCH",headers:{"Prefer":"return=minimal"},body:JSON.stringify({check_out:checkout.toISOString(),worked_minutes:mins,note:"تسجيل خروج",updated_at:now.toISOString()})});
+    await api("attendance?id=eq."+encodeURIComponent(open.id),{method:"PATCH",headers:{"Prefer":"return=minimal"},body:JSON.stringify({check_out:checkout.toISOString(),note:"تسجيل خروج",updated_at:now.toISOString()})});
     toast("تم تسجيل الخروج وحساب الساعات ✓");await refreshState();await loadToday();await loadLogs();
   }catch(e){toast("فشل تسجيل الخروج: "+e.message)}
 }
