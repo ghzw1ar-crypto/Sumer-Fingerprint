@@ -97,18 +97,34 @@ function localDateTime(date, timeValue){
   return new Date(`${date}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}+03:00`);
 }
 function liveMinutes(x){
-  if(!x?.check_in)return 0;
-  const e=x.employees||{}, d=x.work_date;
-  const scheduledStart=shiftStart(e,d);
-  const scheduledEnd=shiftEnd(e,d);
-  const actualIn=new Date(x.check_in);
-  const actualEnd=x.check_out?new Date(x.check_out):new Date();
-  const effectiveStart=new Date(Math.max(actualIn.getTime(),scheduledStart.getTime()));
-  const effectiveEnd=new Date(Math.min(actualEnd.getTime(),scheduledEnd.getTime()));
-  return Math.max(0,Math.floor((effectiveEnd.getTime()-effectiveStart.getTime())/60000));
+  if(!x || !x.check_in) return 0;
+
+  const e = x.employees || {};
+  const d = x.work_date;
+
+  // الحساب يعتمد حصراً على بداية الدوام المحددة للموظف.
+  // البصمة المبكرة لا تضيف وقتاً.
+  const start = shiftStart(e, d);
+  const end = shiftEnd(e, d);
+  const now = new Date();
+
+  // إذا لم يبدأ الدوام بعد، العداد = صفر.
+  if(now.getTime() < start.getTime()){
+    if(!x.check_out) return 0;
+  }
+
+  // للدوام المفتوح: من بداية الدوام إلى الآن.
+  // للدوام المغلق: من بداية الدوام إلى وقت الخروج.
+  let finish = x.check_out ? new Date(x.check_out) : now;
+
+  // لا نحسب بعد نهاية الدوام.
+  if(finish.getTime() > end.getTime()) finish = end;
+
+  // إذا الخروج قبل بداية الدوام، لا يوجد وقت محسوب.
+  if(finish.getTime() <= start.getTime()) return 0;
+
+  return Math.floor((finish.getTime() - start.getTime()) / 60000);
 }
-
-
 let currentRows=[];
 function render(){
   const valid=currentRows;
