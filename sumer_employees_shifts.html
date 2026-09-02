@@ -71,6 +71,10 @@ h1{font-size:25px!important}.cards{grid-template-columns:1fr 1fr;gap:10px}.card{
 <div class="card"><span class="muted">الدوام الافتراضي</span><div class="num">07:00 → 15:00</div></div>
 </section>
 
+<div style="margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#211b11;border:1px solid #57451f;color:#f0c56b;font-size:12px">
+⚠️ أرقام بصمة ظهرت في الجهاز وغير مربوطة حالياً: <b>44، 45، 51</b>
+<br><span style="color:#c9b98e">افتح الموظف الصحيح ← 🔓 تعديل ← أدخل رقم البصمة ← حفظ.</span>
+</div>
 <div class="toolbar">
 <input id="q" class="search" placeholder="ابحث باسم الموظف أو الوظيفة..." oninput="render()">
 <select id="f" onchange="render()"><option value="all">كل الموظفين</option><option value="active">فعال</option><option value="inactive">غير فعال</option></select>
@@ -89,7 +93,13 @@ h1{font-size:25px!important}.cards{grid-template-columns:1fr 1fr;gap:10px}.card{
 <div class="field"><label>اسم الموظف *</label><input id="name"></div>
 <div class="field"><label>الوظيفة *</label><input id="role"></div>
 <div class="field"><label>رقم الموظف</label><input id="code" placeholder="EMP-001" autocomplete="off"><div class="muted">يُولد تلقائياً للموظف الجديد.</div></div>
-<div class="field"><label>رقم البصمة بالجهاز</label><input id="fingerprint" inputmode="numeric" placeholder="مثال: 6" autocomplete="off"><div id="fingerprintHelp" class="muted">User ID الموجود داخل جهاز البصمة.</div></div>
+<div class="field"><label>رقم البصمة بالجهاز</label>
+<div style="display:flex;gap:7px;align-items:stretch">
+<input id="fingerprint" inputmode="numeric" placeholder="مثال: 6" autocomplete="off" style="flex:1">
+<button id="unlockFingerprint" type="button" class="action" onclick="unlockFingerprint()" style="white-space:nowrap">🔓 تعديل</button>
+</div>
+<div id="fingerprintHelp" class="muted">User ID الموجود داخل جهاز البصمة.</div>
+</div>
 <div class="field"><label>أجر الساعة — د.ع</label><input id="pay" type="number" min="0"></div>
 <div class="field"><label>وقت بداية الدوام</label><input id="start" type="time" value="07:00"></div>
 <div class="field"><label>وقت نهاية الدوام</label><input id="end" type="time" value="15:00"></div>
@@ -176,6 +186,8 @@ function openM(){
   document.getElementById("fingerprint").value="";
   document.getElementById("fingerprint").readOnly=false;
   document.getElementById("fingerprint").classList.remove("locked");
+  document.getElementById("unlockFingerprint").textContent="🔓 تعديل";
+  document.getElementById("unlockFingerprint").onclick=unlockFingerprint;
   document.getElementById("fingerprintHelp").textContent="User ID الموجود داخل جهاز البصمة.";
   document.getElementById("pay").value="";
   document.getElementById("start").value="07:00";
@@ -186,6 +198,37 @@ function openM(){
 }
 
 function closeM(){document.getElementById("modal").classList.remove("show");}
+
+function unlockFingerprint(){
+  const el=document.getElementById("fingerprint");
+  if(!editId){
+    el.readOnly=false;
+    el.classList.remove("locked");
+    el.focus();
+    return;
+  }
+  const ok=confirm(
+    "تنبيه: رقم البصمة مرتبط مباشرة بجهاز البصمة.\\n\\n" +
+    "غيّره فقط إذا كنت متأكد من User ID الصحيح للموظف.\\n" +
+    "مثال: 44 أو 45 أو 51."
+  );
+  if(!ok)return;
+  el.readOnly=false;
+  el.classList.remove("locked");
+  document.getElementById("fingerprintHelp").textContent=
+    "⚠️ التعديل مفتوح — أدخل User ID الصحيح من جهاز البصمة.";
+  document.getElementById("unlockFingerprint").textContent="🔒 قفل";
+  document.getElementById("unlockFingerprint").onclick=function(){
+    el.value=el.value.trim();
+    el.readOnly=true;
+    el.classList.add("locked");
+    document.getElementById("fingerprintHelp").textContent=
+      "🔒 رقم البصمة ثابت الآن.";
+    this.textContent="🔓 تعديل";
+    this.onclick=unlockFingerprint;
+  };
+  el.focus();
+}
 
 function editEmployee(id){
   const x=data.find(y=>y.id===id);
@@ -200,6 +243,8 @@ function editEmployee(id){
   document.getElementById("fingerprint").value=originalFingerprint;
   document.getElementById("fingerprint").readOnly=true;
   document.getElementById("fingerprint").classList.add("locked");
+  document.getElementById("unlockFingerprint").textContent="🔓 تعديل";
+  document.getElementById("unlockFingerprint").onclick=unlockFingerprint;
   document.getElementById("fingerprintHelp").textContent="🔒 رقم البصمة ثابت ولا يتغير عند تعديل الاسم أو الدوام.";
   document.getElementById("pay").value=x.hourly_rate||0;
   document.getElementById("start").value=String(x.shift_start||"07:00:00").slice(0,5);
@@ -227,7 +272,8 @@ async function save(){
 
   // عند التعديل: استخدم القيمة الأصلية من السجل، وليس قيمة الحقل.
   // هذا يمنع حذف رقم البصمة حتى لو أصبح الحقل فارغاً لأي سبب.
-  let fingerprintValue=editId?originalFingerprint:String(fpEl.value||"").trim();
+  let fingerprintValue=String(fpEl.value||"").trim();
+  if(editId && fpEl.readOnly) fingerprintValue=originalFingerprint;
 
   if(fingerprintValue&&!/^\d+$/.test(fingerprintValue)){
     alert("رقم البصمة يجب أن يكون رقماً فقط");return;
