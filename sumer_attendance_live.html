@@ -51,35 +51,75 @@ h2{margin:0 0 6px}.select{width:100%;margin-top:18px;background:#0f151b;color:#f
 
 <script src="sumer_auth.js"></script>
 <script>
-
 const SUPABASE_URL="https://glbugvsorxtzixgexdak.supabase.co";
 const SUPABASE_KEY="sb_publishable_8iv3CIQ3MaQ6E9oPgK6N8A_KTYGp-V6";
 const API=SUPABASE_URL+"/rest/v1/";
 const HEAD={"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Content-Type":"application/json"};
+const IRAQ_OFFSET="+03:00";
 let employees=[];
 
 async function api(path,options={}){
   const r=await fetch(API+path,{...options,headers:{...HEAD,...(options.headers||{})}});
-  const text=await r.text(); let data=null; try{data=text?JSON.parse(text):null}catch{}
+  const text=await r.text(); let data=null;
+  try{data=text?JSON.parse(text):null}catch{}
   if(!r.ok) throw new Error((data&&data.message)||text||("HTTP "+r.status));
   return data;
 }
-function iraqDate(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Baghdad",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())}
-function fmtMoney(n){return Number(n||0).toLocaleString("ar-IQ")+" د.ع عراقي"}
-function fmtTime(v){return v?new Date(v).toLocaleTimeString("ar-IQ",{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Baghdad"}):"—"}
-function fmtMinutes(m){m=Math.max(0,Number(m||0));return Math.floor(m/60)+"س "+(m%60)+"د"}
-function shiftEndFor(e,checkIn){
-  const d=new Date(checkIn), [hh,mm,ss]=String(e.shift_end||"15:00:00").split(":").map(Number);
-  const end=new Date(d); end.setHours(hh||0,mm||0,ss||0,0);
-  const [sh,sm]=String(e.shift_start||"07:00:00").split(":").map(Number);
-  if((hh||0)*60+(mm||0) <= (sh||0)*60+(sm||0)) end.setDate(end.getDate()+1);
-  return end;
+
+function iraqParts(date=new Date()){
+  const parts=new Intl.DateTimeFormat("en-CA",{
+    timeZone:"Asia/Baghdad",year:"numeric",month:"2-digit",day:"2-digit",
+    hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false
+  }).formatToParts(date);
+  const o={};
+  for(const p of parts) if(p.type!=="literal") o[p.type]=p.value;
+  return o;
 }
-function cappedMinutes(e,checkIn,checkOut){
+function iraqDate(date=new Date()){
+  const p=iraqParts(date); return `${p.year}-${p.month}-${p.day}`;
+}
+function fmtMoney(n){return Number(n||0).toLocaleString("ar-IQ")+" د.ع عراقي"}
+function fmtTime(v){
+  return v?new Date(v).toLocaleTimeString("ar-IQ",{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Baghdad"}):"—";
+}
+function fmtMinutes(m){
+  m=Math.max(0,Math.floor(Number(m||0)));
+  return Math.floor(m/60)+"س "+(m%60)+"د";
+}
+function hm(s, fallback){
+  const raw=String(s||fallback||"00:00:00").split(":");
+  return [Number(raw[0])||0,Number(raw[1])||0,Number(raw[2])||0];
+}
+function addDaysISO(iso,days){
+  const d=new Date(iso+"T00:00:00"+IRAQ_OFFSET);
+  d.setUTCDate(d.getUTCDate()+days);
+  return d.toISOString().slice(0,10);
+}
+function scheduledStart(e,workDate){
+  const [h,m,s]=hm(e?.shift_start,"07:00:00");
+  return new Date(`${workDate}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}${IRAQ_OFFSET}`);
+}
+function scheduledEnd(e,workDate){
+  const [sh,sm]=hm(e?.shift_start,"07:00:00");
+  const [eh,em,es]=hm(e?.shift_end,"15:00:00");
+  const startMin=sh*60+sm;
+  const endMin=eh*60+em;
+  const endDate=endMin<=startMin?addDaysISO(workDate,1):workDate;
+  return new Date(`${endDate}T${String(eh).padStart(2,"0")}:${String(em).padStart(2,"0")}:${String(es).padStart(2,"0")}${IRAQ_OFFSET}`);
+}
+function effectiveStart(e,checkIn,workDate){
+  const actual=new Date(checkIn);
+  const planned=scheduledStart(e,workDate);
+  return actual.getTime()<planned.getTime()?planned:actual;
+}
+function cappedMinutes(e,checkIn,checkOut,workDate){
   if(!checkIn)return 0;
-  const end=new Date(checkOut||new Date());
-  const cap=shiftEndFor(e,checkIn);
-  return Math.max(0,Math.floor((Math.min(end.getTime(),cap.getTime())-new Date(checkIn).getTime())/60000));
+  const wd=workDate||iraqDate(new Date(checkIn));
+  const start=effectiveStart(e,checkIn,wd);
+  const endLimit=scheduledEnd(e,wd);
+  const out=new Date(checkOut||new Date());
+  const end=new Date(Math.min(out.getTime(),endLimit.getTime()));
+  return Math.max(0,Math.floor((end.getTime()-start.getTime())/60000));
 }
 async function closeFinishedShifts(){
   try{
@@ -88,12 +128,16 @@ async function closeFinishedShifts(){
     for(const row of (open||[])){
       const e=employees.find(x=>x.id===row.employee_id);
       if(!e || !e.auto_checkout) continue;
-      const end=shiftEndFor(e,row.check_in);
+      const end=scheduledEnd(e,row.work_date);
       if(now>=end.getTime()){
-        const mins=cappedMinutes(e,row.check_in,end);
         await api("attendance?id=eq."+encodeURIComponent(row.id),{
-          method:"PATCH",headers:{"Prefer":"return=minimal"},
-          body:JSON.stringify({check_out:end.toISOString(),note:"خروج تلقائي عند انتهاء الدوام",updated_at:new Date().toISOString()})
+          method:"PATCH",
+          headers:{"Prefer":"return=minimal"},
+          body:JSON.stringify({
+            check_out:end.toISOString(),
+            note:"خروج تلقائي عند انتهاء الدوام",
+            updated_at:new Date().toISOString()
+          })
         });
       }
     }
@@ -105,59 +149,116 @@ async function loadEmployees(){
     const el=document.getElementById("employee");
     el.innerHTML=employees.length?employees.map(x=>`<option value="${x.id}">${x.full_name} — ${x.job_title||"موظف"} — ${x.employee_code}</option>`).join(""):"<option value=''>لا يوجد موظفون فعالون</option>";
     await closeFinishedShifts();
-    if(employees.length) await refreshState(); else {employeeBox.style.display="none";status.textContent="أضف موظفاً أولاً من صفحة الموظفين";}
+    if(employees.length) await refreshState();
+    else {employeeBox.style.display="none";status.textContent="أضف موظفاً أولاً من صفحة الموظفين";}
     await loadToday(); await loadLogs();
-  }catch(e){employee.innerHTML="<option>تعذر تحميل الموظفين</option>";status.textContent="خطأ: "+e.message;console.error(e)}
+  }catch(e){
+    employee.innerHTML="<option>تعذر تحميل الموظفين</option>";
+    status.textContent="خطأ: "+e.message;
+    console.error(e)
+  }
 }
-async function getOpen(id){const rows=await api(`attendance?select=*&employee_id=eq.${encodeURIComponent(id)}&check_out=is.null&order=check_in.desc&limit=1`);return rows?.[0]||null}
+async function getOpen(id){
+  const rows=await api(`attendance?select=*&employee_id=eq.${encodeURIComponent(id)}&check_out=is.null&order=check_in.desc&limit=1`);
+  return rows?.[0]||null;
+}
 async function refreshState(){
-  const id=employee.value,e=employees.find(x=>x.id===id);if(!e)return;
-  employeeBox.style.display="flex";name.textContent=e.full_name;job.textContent=(e.job_title||"موظف")+" · "+e.employee_code;avatar.textContent=e.full_name[0];rate.textContent=fmtMoney(e.hourly_rate);
+  const id=employee.value,e=employees.find(x=>x.id===id); if(!e)return;
+  employeeBox.style.display="flex";
+  name.textContent=e.full_name;
+  job.textContent=(e.job_title||"موظف")+" · "+e.employee_code;
+  avatar.textContent=e.full_name[0];
+  rate.textContent=fmtMoney(e.hourly_rate);
   shift.textContent=String(e.shift_start||"07:00:00").slice(0,5)+" → "+String(e.shift_end||"15:00:00").slice(0,5);
   await closeFinishedShifts();
   const open=await getOpen(id);
-  inBtn.disabled=!!open;outBtn.disabled=!open;
+  inBtn.disabled=!!open; outBtn.disabled=!open;
   status.innerHTML=open?`<span class="green">● دوام مفتوح</span> — بدأ ${fmtTime(open.check_in)}`:"جاهز لتسجيل الدخول";
 }
 async function checkIn(){
   const id=employee.value;if(!id)return;
   const open=await getOpen(id);if(open){await refreshState();return}
-  const now=new Date(),workDate=iraqDate();
+  const now=new Date(),workDate=iraqDate(now);
   try{
-    await api("attendance",{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify({employee_id:id,work_date:workDate,check_in:now.toISOString(),note:"تسجيل دخول"})});
-    toast("تم تسجيل الدخول بنجاح ✓");await refreshState();await loadToday();await loadLogs();
+    await api("attendance",{
+      method:"POST",
+      headers:{"Prefer":"return=minimal"},
+      body:JSON.stringify({
+        employee_id:id,work_date:workDate,check_in:now.toISOString(),note:"تسجيل دخول"
+      })
+    });
+    toast("تم تسجيل الدخول بنجاح ✓");
+    await refreshState();await loadToday();await loadLogs();
   }catch(e){toast("فشل تسجيل الدخول: "+e.message)}
 }
 async function checkOut(){
   const id=employee.value;if(!id)return;
   const open=await getOpen(id);if(!open){await refreshState();return}
-  const e=employees.find(x=>x.id===id),now=new Date(),end=e?.auto_checkout?shiftEndFor(e,open.check_in):now;
-  const checkout=new Date(Math.min(now.getTime(),end.getTime())),mins=cappedMinutes(e||{},open.check_in,checkout);
+  const e=employees.find(x=>x.id===id),now=new Date();
+  const end=e?.auto_checkout?scheduledEnd(e,open.work_date):now;
+  const checkout=new Date(Math.min(now.getTime(),end.getTime()));
   try{
-    await api("attendance?id=eq."+encodeURIComponent(open.id),{method:"PATCH",headers:{"Prefer":"return=minimal"},body:JSON.stringify({check_out:checkout.toISOString(),note:"تسجيل خروج",updated_at:now.toISOString()})});
-    toast("تم تسجيل الخروج وحساب الساعات ✓");await refreshState();await loadToday();await loadLogs();
+    await api("attendance?id=eq."+encodeURIComponent(open.id),{
+      method:"PATCH",
+      headers:{"Prefer":"return=minimal"},
+      body:JSON.stringify({
+        check_out:checkout.toISOString(),
+        note:"تسجيل خروج",
+        updated_at:now.toISOString()
+      })
+    });
+    toast("تم تسجيل الخروج وحساب الساعات ✓");
+    await refreshState();await loadToday();await loadLogs();
   }catch(e){toast("فشل تسجيل الخروج: "+e.message)}
 }
 async function loadToday(){
   try{
-    const today=iraqDate(),rows=await api(`attendance?select=*,employees(full_name,hourly_rate,shift_start,shift_end)&work_date=eq.${today}&order=check_in.desc`);
-    present.textContent=new Set(rows.map(x=>x.employee_id)).size;
-    const mins=rows.reduce((s,x)=>{const e=x.employees||{};return s+cappedMinutes(e,x.check_in,x.check_out||new Date())},0);
+    const today=iraqDate();
+    const rows=await api(`attendance?select=*,employees(full_name,hourly_rate,shift_start,shift_end)&work_date=eq.${today}&order=check_in.desc`);
+    // "حاضر" = الموظفون الذين ما زال دوامهم مفتوحاً فقط.
+    present.textContent=new Set(rows.filter(x=>!x.check_out).map(x=>x.employee_id)).size;
+
+    const mins=rows.reduce((s,x)=>{
+      const e=x.employees||{};
+      return s+cappedMinutes(e,x.check_in,x.check_out||new Date(),x.work_date);
+    },0);
     hours.textContent=fmtMinutes(mins);
-    const payValue=rows.reduce((s,x)=>{const e=x.employees||{};return s+(cappedMinutes(e,x.check_in,x.check_out||new Date())/60)*Number(e.hourly_rate||0)},0);
+
+    const payValue=rows.reduce((s,x)=>{
+      const e=x.employees||{};
+      return s+(cappedMinutes(e,x.check_in,x.check_out||new Date(),x.work_date)/60)*Number(e.hourly_rate||0);
+    },0);
     pay.textContent=fmtMoney(Math.round(payValue));
   }catch(e){console.error(e)}
 }
 async function loadLogs(){
   try{
     const rows=await api("attendance?select=*,employees(full_name)&order=created_at.desc&limit=8");
-    logs.innerHTML=rows.map(x=>`<div class="item"><span><b>${x.employees?.full_name||"—"}</b></span><span>${fmtTime(x.check_in)}</span><span>${fmtTime(x.check_out)}</span><span class="${x.check_out?"green":"gold"}">${x.check_out?fmtMinutes(x.worked_minutes):"مفتوح"}</span></div>`).join("")||'<div class="muted">لا توجد عمليات بعد</div>';
+    logs.innerHTML=rows.map(x=>
+      `<div class="item"><span><b>${x.employees?.full_name||"—"}</b></span>
+      <span>${fmtTime(x.check_in)}</span><span>${fmtTime(x.check_out)}</span>
+      <span class="${x.check_out?"green":"gold"}">${x.check_out?fmtMinutes(x.worked_minutes):"مفتوح"}</span></div>`
+    ).join("")||'<div class="muted">لا توجد عمليات بعد</div>';
   }catch(e){logs.innerHTML='<div class="muted">تعذر تحميل السجل</div>';console.error(e)}
 }
-function toast(m){const e=document.getElementById("toast");e.textContent=m;e.style.display="block";setTimeout(()=>e.style.display="none",2500)}
-function tick(){const d=new Date();clock.textContent=d.toLocaleTimeString("ar-IQ",{hour12:false,timeZone:"Asia/Baghdad"});date.textContent=d.toLocaleDateString("ar-IQ",{weekday:"long",year:"numeric",month:"long",day:"numeric",timeZone:"Asia/Baghdad"})}
-tick();setInterval(tick,1000);loadEmployees();setInterval(async()=>{await closeFinishedShifts();await loadToday();await loadLogs();if(employee.value)await refreshState()},60000);
-
+function toast(m){
+  const e=document.getElementById("toast");
+  e.textContent=m;e.style.display="block";
+  setTimeout(()=>e.style.display="none",2500)
+}
+function tick(){
+  const d=new Date();
+  clock.textContent=d.toLocaleTimeString("ar-IQ",{hour12:false,timeZone:"Asia/Baghdad"});
+  date.textContent=d.toLocaleDateString("ar-IQ",{weekday:"long",year:"numeric",month:"long",day:"numeric",timeZone:"Asia/Baghdad"});
+}
+tick();setInterval(tick,1000);
+loadEmployees();
+setInterval(async()=>{
+  await closeFinishedShifts();
+  await loadToday();
+  await loadLogs();
+  if(employee.value)await refreshState();
+},5000);
 </script>
 </body>
 </html>
