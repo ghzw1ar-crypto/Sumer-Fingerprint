@@ -88,28 +88,25 @@ function validForWorkDate(x,d){
 }
 
 function liveMinutes(x){
-  if(!x.check_in)return 0;
+  if(!x?.check_in)return 0;
   const e=x.employees||{}, d=x.work_date;
 
-  // IMPORTANT:
-  // The paid/worked counter starts at the scheduled shift start,
-  // even when the employee fingerprints earlier.
-  const scheduledStart = shiftStart(e,d);
-  const scheduledEnd = shiftEnd(e,d);
-  const actualIn = new Date(x.check_in);
+  const scheduledStart=shiftStart(e,d);
+  const scheduledEnd=shiftEnd(e,d);
+  const actualIn=new Date(x.check_in);
 
-  // Effective start = later of actual fingerprint or scheduled shift start.
-  const effectiveStart = new Date(Math.max(actualIn.getTime(), scheduledStart.getTime()));
+  // Before shift start: 0 minutes.
+  // After shift start: count from scheduled start, not from fingerprint time.
+  const now=new Date();
+  const effectiveStart=new Date(Math.max(actualIn.getTime(),scheduledStart.getTime()));
 
-  // For an open shift, count up to now but never past shift end.
-  // For a closed shift, count up to checkout but never past shift end.
-  const actualOut = x.check_out ? new Date(x.check_out) : new Date();
-  const effectiveEnd = new Date(Math.min(actualOut.getTime(), scheduledEnd.getTime()));
+  let actualEnd=x.check_out?new Date(x.check_out):now;
+  const effectiveEnd=new Date(Math.min(actualEnd.getTime(),scheduledEnd.getTime()));
 
-  return Math.max(
-    0,
-    Math.floor((effectiveEnd.getTime()-effectiveStart.getTime())/60000)
-  );
+  // Never count time before the scheduled shift starts.
+  if(now.getTime() < scheduledStart.getTime() && !x.check_out)return 0;
+
+  return Math.max(0,Math.floor((effectiveEnd.getTime()-effectiveStart.getTime())/60000));
 }
 
 async function load(){
@@ -158,6 +155,12 @@ function printReport(){
 }
 date.value=iraqDate();
 load();
-setInterval(()=>{if(document.visibilityState!=="hidden")load()},10000);
+setInterval(()=>{
+  if(document.visibilityState!=="hidden"){
+    // Update the visible counters every second from the current time.
+    const d=document.getElementById("date").value||iraqDate();
+    if(d===iraqDate()) load();
+  }
+},5000);
 </script>
 </body></html>
