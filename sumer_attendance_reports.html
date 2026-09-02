@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>مطعم سومر | التقارير — حساب من بداية الدوام</title>
 <style>
 :root{--bg:#0d1218;--p:#151c24;--line:#29333e;--gold:#d9a441;--gold2:#f0c56b;--text:#f5f7fa;--muted:#9ba7b4;--green:#39d276;--red:#ff5d5d}
@@ -100,30 +100,36 @@ function liveMinutes(x){
   if(!x || !x.check_in) return 0;
 
   const e = x.employees || {};
-  const d = x.work_date;
+  const workDate = String(x.work_date || "");
+  const startText = String(e.shift_start || "07:00:00").slice(0,8);
+  const endText = String(e.shift_end || "15:00:00").slice(0,8);
 
-  // الحساب يعتمد حصراً على بداية الدوام المحددة للموظف.
-  // البصمة المبكرة لا تضيف وقتاً.
-  const start = shiftStart(e, d);
-  const end = shiftEnd(e, d);
-  const now = new Date();
+  // Baghdad is UTC+3. Build shift boundaries as fixed instants.
+  const startMs = Date.parse(workDate + "T" + startText + "+03:00");
+  const sh = Number(startText.slice(0,2));
+  const sm = Number(startText.slice(3,5));
+  const eh = Number(endText.slice(0,2));
+  const em = Number(endText.slice(3,5));
 
-  // إذا لم يبدأ الدوام بعد، العداد = صفر.
-  if(now.getTime() < start.getTime()){
-    if(!x.check_out) return 0;
+  let endDate = workDate;
+  if((eh * 60 + em) <= (sh * 60 + sm)){
+    const d = new Date(Date.parse(workDate + "T00:00:00+03:00"));
+    d.setUTCDate(d.getUTCDate() + 1);
+    endDate = d.toISOString().slice(0,10);
   }
 
-  // للدوام المفتوح: من بداية الدوام إلى الآن.
-  // للدوام المغلق: من بداية الدوام إلى وقت الخروج.
-  let finish = x.check_out ? new Date(x.check_out) : now;
+  const endMs = Date.parse(endDate + "T" + endText + "+03:00");
+  const nowMs = Date.now();
 
-  // لا نحسب بعد نهاية الدوام.
-  if(finish.getTime() > end.getTime()) finish = end;
+  // Closed record: stop at actual checkout.
+  // Open record: stop at current time.
+  let finishMs = x.check_out ? Date.parse(x.check_out) : nowMs;
 
-  // إذا الخروج قبل بداية الدوام، لا يوجد وقت محسوب.
-  if(finish.getTime() <= start.getTime()) return 0;
+  // Never count before scheduled start and never count after scheduled end.
+  finishMs = Math.min(finishMs, endMs);
+  if(finishMs <= startMs) return 0;
 
-  return Math.floor((finish.getTime() - start.getTime()) / 60000);
+  return Math.max(0, Math.floor((finishMs - startMs) / 60000));
 }
 let currentRows=[];
 function render(){
