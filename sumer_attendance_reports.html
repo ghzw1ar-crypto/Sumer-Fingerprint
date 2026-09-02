@@ -101,34 +101,43 @@ function liveMinutes(x){
 
   const e = x.employees || {};
   const workDate = String(x.work_date || "");
-  const start = String(e.shift_start || "07:00:00").slice(0,8);
-  const finish = String(e.shift_end || "15:00:00").slice(0,8);
+  const ci = new Date(x.check_in);
 
-  // All shift calculations are fixed to Baghdad (+03:00).
-  const startMs = Date.parse(`${workDate}T${start}+03:00`);
+  // The attendance record must belong to the selected Baghdad calendar day.
+  // Old records that were incorrectly assigned to today are never counted.
+  const ciBaghdad = new Intl.DateTimeFormat("en-CA",{
+    timeZone:"Asia/Baghdad",
+    year:"numeric",month:"2-digit",day:"2-digit"
+  }).format(ci);
 
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = finish.split(":").map(Number);
+  if(ciBaghdad !== workDate) return 0;
+
+  const startText = String(e.shift_start || "07:00:00").slice(0,8);
+  const endText   = String(e.shift_end   || "15:00:00").slice(0,8);
+
+  const startMs = Date.parse(`${workDate}T${startText}+03:00`);
+
+  const sp = startText.split(":").map(Number);
+  const ep = endText.split(":").map(Number);
 
   let endDate = workDate;
-  if ((eh * 60 + em) <= (sh * 60 + sm)) {
+  if((ep[0]*60 + (ep[1]||0)) <= (sp[0]*60 + (sp[1]||0))){
     const next = new Date(startMs);
-    next.setUTCDate(next.getUTCDate() + 1);
+    next.setUTCDate(next.getUTCDate()+1);
     endDate = next.toISOString().slice(0,10);
   }
 
-  const endMs = Date.parse(`${endDate}T${finish}+03:00`);
+  const endMs = Date.parse(`${endDate}T${endText}+03:00`);
+  let finishMs = x.check_out ? Date.parse(x.check_out) : Date.now();
 
-  // Open attendance: count until NOW.
-  // Closed attendance: count until CHECK-OUT.
-  let actualEndMs = x.check_out ? Date.parse(x.check_out) : Date.now();
+  if(!Number.isFinite(startMs) || !Number.isFinite(endMs) || !Number.isFinite(finishMs)) return 0;
 
-  // Never count before scheduled start or after scheduled end.
-  actualEndMs = Math.min(actualEndMs, endMs);
+  finishMs = Math.min(finishMs,endMs);
 
-  if (actualEndMs <= startMs) return 0;
+  // Do not count before the scheduled shift starts.
+  if(finishMs <= startMs) return 0;
 
-  return Math.floor((actualEndMs - startMs) / 60000);
+  return Math.floor((finishMs-startMs)/60000);
 }
 let currentRows=[];
 function render(){
