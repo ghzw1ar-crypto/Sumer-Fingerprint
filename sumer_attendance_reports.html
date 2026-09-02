@@ -101,35 +101,34 @@ function liveMinutes(x){
 
   const e = x.employees || {};
   const workDate = String(x.work_date || "");
-  const startText = String(e.shift_start || "07:00:00").slice(0,8);
-  const endText = String(e.shift_end || "15:00:00").slice(0,8);
+  const start = String(e.shift_start || "07:00:00").slice(0,8);
+  const finish = String(e.shift_end || "15:00:00").slice(0,8);
 
-  // Baghdad is UTC+3. Build shift boundaries as fixed instants.
-  const startMs = Date.parse(workDate + "T" + startText + "+03:00");
-  const sh = Number(startText.slice(0,2));
-  const sm = Number(startText.slice(3,5));
-  const eh = Number(endText.slice(0,2));
-  const em = Number(endText.slice(3,5));
+  // All shift calculations are fixed to Baghdad (+03:00).
+  const startMs = Date.parse(`${workDate}T${start}+03:00`);
+
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = finish.split(":").map(Number);
 
   let endDate = workDate;
-  if((eh * 60 + em) <= (sh * 60 + sm)){
-    const d = new Date(Date.parse(workDate + "T00:00:00+03:00"));
-    d.setUTCDate(d.getUTCDate() + 1);
-    endDate = d.toISOString().slice(0,10);
+  if ((eh * 60 + em) <= (sh * 60 + sm)) {
+    const next = new Date(startMs);
+    next.setUTCDate(next.getUTCDate() + 1);
+    endDate = next.toISOString().slice(0,10);
   }
 
-  const endMs = Date.parse(endDate + "T" + endText + "+03:00");
-  const nowMs = Date.now();
+  const endMs = Date.parse(`${endDate}T${finish}+03:00`);
 
-  // Closed record: stop at actual checkout.
-  // Open record: stop at current time.
-  let finishMs = x.check_out ? Date.parse(x.check_out) : nowMs;
+  // Open attendance: count until NOW.
+  // Closed attendance: count until CHECK-OUT.
+  let actualEndMs = x.check_out ? Date.parse(x.check_out) : Date.now();
 
-  // Never count before scheduled start and never count after scheduled end.
-  finishMs = Math.min(finishMs, endMs);
-  if(finishMs <= startMs) return 0;
+  // Never count before scheduled start or after scheduled end.
+  actualEndMs = Math.min(actualEndMs, endMs);
 
-  return Math.max(0, Math.floor((finishMs - startMs) / 60000));
+  if (actualEndMs <= startMs) return 0;
+
+  return Math.floor((actualEndMs - startMs) / 60000);
 }
 let currentRows=[];
 function render(){
