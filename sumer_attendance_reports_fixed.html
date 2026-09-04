@@ -110,24 +110,24 @@ function payableMinutes(x){
   if(!x?.check_in)return 0;
 
   const e=x.employees||{};
-  const d=x.work_date;
+  const workDate=x.work_date;
   const actualIn=new Date(x.check_in);
   if(Number.isNaN(actualIn.getTime()))return 0;
 
-  let actualEnd=x.check_out?new Date(x.check_out):new Date();
-  if(Number.isNaN(actualEnd.getTime()))actualEnd=new Date();
+  // Wage starts exactly at the real fingerprint time.
+  // For an open record, use the current time; for a closed record, use check-out.
+  const actualEnd=x.check_out?new Date(x.check_out):new Date();
+  if(Number.isNaN(actualEnd.getTime()))return 0;
 
-  // Wage starts at the actual fingerprint time, but never continues
-  // beyond the employee's scheduled shift end.
-  const scheduledEnd=shiftEnd(e,d);
-  const effectiveEnd=new Date(
-    Math.min(actualEnd.getTime(),scheduledEnd.getTime())
-  );
+  // Wage cannot continue beyond the employee's scheduled shift end.
+  const endLimit=shiftEnd(e,workDate);
+  const endMs=Math.min(actualEnd.getTime(),endLimit.getTime());
 
-  return Math.max(
-    0,
-    Math.floor((effectiveEnd.getTime()-actualIn.getTime())/60000)
-  );
+  // If the employee fingerprinted after the scheduled shift ended,
+  // there is no payable time for this shift.
+  if(endMs<=actualIn.getTime())return 0;
+
+  return Math.floor((endMs-actualIn.getTime())/60000);
 }
 
 let reportRows=[];
@@ -138,13 +138,15 @@ function renderReport(){
   present.textContent=new Set(valid.map(x=>x.employee_id)).size;
   records.textContent=valid.length;
 
-  // Summary "hours" remains attendance duration (actualIn -> actual end/now).
+  // Attendance duration: actual fingerprint -> actual checkout/current time.
   const attendanceTotal=valid.reduce((s,x)=>s+attendanceMinutes(x),0);
   hours.textContent=duration(attendanceTotal);
 
-  // Total wages use payable duration, capped at scheduled shift end.
+  // Wage total: actual fingerprint -> min(checkout/current time, scheduled shift end).
   const total=valid.reduce((s,x)=>{
-    return s+(payableMinutes(x)/60)*Number(x.employees?.hourly_rate||0);
+    const minutes=payableMinutes(x);
+    const hourly=Number(x.employees?.hourly_rate||0);
+    return s+(minutes/60)*hourly;
   },0);
   pay.textContent=money(total);
 
@@ -152,8 +154,10 @@ function renderReport(){
     const attendanceM=attendanceMinutes(x);
     const payableM=payableMinutes(x);
     const hourly=Number(x.employees?.hourly_rate||0);
-    const p=(payableM/60)*hourly;
-    const capped=payableM<attendanceM;
+    const amount=(payableM/60)*hourly;
+    const shiftEndAt=shiftEnd(x.employees||{},x.work_date);
+    const attendanceEnd=x.check_out?new Date(x.check_out):new Date();
+    const wageStopped=attendanceEnd.getTime()>shiftEndAt.getTime() && payableM>0;
 
     return `<div class="row">
       <b>${x.employees?.full_name||"—"}</b>
@@ -164,9 +168,10 @@ function renderReport(){
         ${duration(attendanceM)}${x.check_out?"":" • مفتوح"}
       </span>
       <span>${money(hourly)}</span>
-      <b class="gold">${money(p)}
+      <b class="gold">
+        ${money(amount)}
         <small style="display:block;color:var(--muted);font-size:10px;font-weight:normal;margin-top:3px">
-          أجر ${duration(payableM)}${capped?" • متوقف عند نهاية الشفت":""}
+          أجر ${duration(payableM)}${wageStopped?" • متوقف عند نهاية الشفت":""}
         </small>
       </b>
     </div>`;
