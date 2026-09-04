@@ -106,41 +106,47 @@ function liveMinutes(x){
   return Math.max(0,Math.floor((effectiveEnd.getTime()-effectiveStart.getTime())/60000));
 }
 
+let reportRows=[];
+
+function renderReport(){
+  const valid=reportRows;
+
+  present.textContent=new Set(valid.map(x=>x.employee_id)).size;
+  records.textContent=valid.length;
+
+  const mins=valid.reduce((s,x)=>s+liveMinutes(x),0);
+  hours.textContent=duration(mins);
+
+  const total=valid.reduce((s,x)=>{
+    return s+(liveMinutes(x)/60)*Number(x.employees?.hourly_rate||0);
+  },0);
+  pay.textContent=money(total);
+
+  rows.innerHTML=valid.map(x=>{
+    const m=liveMinutes(x);
+    const p=(m/60)*Number(x.employees?.hourly_rate||0);
+    return `<div class="row">
+      <b>${x.employees?.full_name||"—"}</b>
+      <span>${x.work_date}</span>
+      <span>${time(x.check_in)}</span>
+      <span>${time(x.check_out)}</span>
+      <span class="badge ${x.check_out?"ok":"open"}">${duration(m)}${x.check_out?"":" • مفتوح"}</span>
+      <span>${money(x.employees?.hourly_rate||0)}</span>
+      <b class="gold">${money(p)}</b>
+    </div>`;
+  }).join("")||'<div class="empty">لا توجد سجلات حضور صحيحة لهذا اليوم</div>';
+}
+
 async function load(){
   const d=document.getElementById("date").value||iraqDate();
   document.getElementById("date").value=d;
   try{
     const data=await api(`attendance?select=*,employees(full_name,hourly_rate,shift_start,shift_end)&work_date=eq.${d}&order=check_in.asc`);
 
-    // IMPORTANT: show every attendance row stored in Supabase for the selected work_date.
-    // Do not hide rows based on shift time; the database is the source of truth.
-    const valid=data;
-
-    present.textContent=new Set(valid.map(x=>x.employee_id)).size;
-    records.textContent=valid.length;
-
-    const mins=valid.reduce((s,x)=>s+liveMinutes(x),0);
-    hours.textContent=duration(mins);
-
-    const total=valid.reduce((s,x)=>{
-      return s+(liveMinutes(x)/60)*Number(x.employees?.hourly_rate||0);
-    },0);
-    pay.textContent=money(total);
-
-    rows.innerHTML=valid.map(x=>{
-      const m=liveMinutes(x);
-      const p=(m/60)*Number(x.employees?.hourly_rate||0);
-      return `<div class="row">
-        <b>${x.employees?.full_name||"—"}</b>
-        <span>${x.work_date}</span>
-        <span>${time(x.check_in)}</span>
-        <span>${time(x.check_out)}</span>
-        <span class="badge ${x.check_out?"ok":"open"}">${duration(m)}${x.check_out?"":" • مفتوح"}</span>
-        <span>${money(x.employees?.hourly_rate||0)}</span>
-        <b class="gold">${money(p)}</b>
-      </div>`;
-    }).join("")||'<div class="empty">لا توجد سجلات حضور صحيحة لهذا اليوم</div>';
-
+    // Supabase is queried only when data needs refreshing.
+    // The live counter itself is updated locally every second from actualIn.
+    reportRows=data||[];
+    renderReport();
   }catch(e){
     rows.innerHTML='<div class="empty">حدث خطأ في تحميل التقرير: '+e.message+'</div>';
   }
@@ -154,9 +160,8 @@ date.value=iraqDate();
 load();
 setInterval(()=>{
   if(document.visibilityState!=="hidden"){
-    // Update the visible counters every second from the current time.
-    const d=document.getElementById("date").value||iraqDate();
-    if(d===iraqDate()) load();
+    // Recalculate open attendance from actualIn every second.
+    renderReport();
   }
 },1000);
 </script>
