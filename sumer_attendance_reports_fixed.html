@@ -89,21 +89,26 @@ function validForWorkDate(x,d){
 
 function liveMinutes(x){
   if(!x?.check_in)return 0;
-  const e=x.employees||{}, d=x.work_date;
 
-  const scheduledStart=shiftStart(e,d);
-  const scheduledEnd=shiftEnd(e,d);
+  const e=x.employees||{};
+  const d=x.work_date;
   const actualIn=new Date(x.check_in);
+  if(Number.isNaN(actualIn.getTime()))return 0;
 
-  // Start counting from the employee's actual fingerprint/check-in time,
-  // even when the employee arrives before the scheduled shift start.
+  // The employee's actual fingerprint/check-in is the start of paid time.
+  // Do not wait for the scheduled shift start.
   const now=new Date();
-  const effectiveStart=actualIn;
-
   let actualEnd=x.check_out?new Date(x.check_out):now;
+  if(Number.isNaN(actualEnd.getTime()))actualEnd=now;
+
+  // Keep the existing shift-end cap, but never move the start forward.
+  const scheduledEnd=shiftEnd(e,d);
   const effectiveEnd=new Date(Math.min(actualEnd.getTime(),scheduledEnd.getTime()));
 
-  return Math.max(0,Math.floor((effectiveEnd.getTime()-effectiveStart.getTime())/60000));
+  return Math.max(
+    0,
+    Math.floor((effectiveEnd.getTime()-actualIn.getTime())/60000)
+  );
 }
 
 let reportRows=[];
@@ -160,7 +165,7 @@ date.value=iraqDate();
 load();
 setInterval(()=>{
   if(document.visibilityState!=="hidden"){
-    // Recalculate open attendance from actualIn every second.
+    // Refresh the displayed duration and wage every second from actualIn.
     renderReport();
   }
 },1000);
