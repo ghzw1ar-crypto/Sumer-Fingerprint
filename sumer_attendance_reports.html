@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>مطعم سومر | التقارير — حساب من بداية الدوام</title>
+<title>مطعم سومر | التقارير — الحساب من وقت البصمة</title>
 <style>
 :root{--bg:#0d1218;--p:#151c24;--line:#29333e;--gold:#d9a441;--gold2:#f0c56b;--text:#f5f7fa;--muted:#9ba7b4;--green:#39d276;--red:#ff5d5d}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Tahoma,Arial}.wrap{max-width:1200px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.brand{font-size:23px;font-weight:bold;color:var(--gold2)}.muted{color:var(--muted);font-size:12px}.controls{display:flex;gap:9px}.control{background:var(--p);border:1px solid var(--line);color:white;border-radius:10px;padding:11px}.btn{background:var(--gold);border:0;border-radius:10px;padding:11px 16px;font-weight:bold}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}.card{background:linear-gradient(145deg,var(--p),#121820);border:1px solid var(--line);border-radius:17px;padding:18px}.label{color:var(--muted);font-size:12px}.num{font-size:24px;font-weight:bold;margin-top:8px}.gold{color:var(--gold2)}.green{color:var(--green)}.red{color:var(--red)}.table{margin-top:16px;overflow:auto}.head,.row{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr 1fr;min-width:900px;gap:9px;align-items:center}.head{color:var(--muted);font-size:11px;padding-bottom:12px}.row{border-top:1px solid var(--line);padding:13px 4px;font-size:12px}.badge{padding:5px 8px;border-radius:20px;width:max-content}.ok{background:#153c29;color:#57e18b}.open{background:#3d321b;color:#f0c56b}.empty{text-align:center;padding:35px;color:var(--muted)}@media(max-width:750px){.wrap{padding:14px}.cards{grid-template-columns:1fr 1fr}.top{align-items:flex-start;gap:12px;flex-direction:column}.controls{width:100%;flex-wrap:wrap}.control{flex:1}.btn{width:100%}}
@@ -95,16 +95,13 @@ function liveMinutes(x){
   const scheduledEnd=shiftEnd(e,d);
   const actualIn=new Date(x.check_in);
 
-  // Before shift start: 0 minutes.
-  // After shift start: count from scheduled start, not from fingerprint time.
+  // Start counting from the employee's actual fingerprint/check-in time,
+  // even when the employee arrives before the scheduled shift start.
   const now=new Date();
-  const effectiveStart=new Date(Math.max(actualIn.getTime(),scheduledStart.getTime()));
+  const effectiveStart=actualIn;
 
   let actualEnd=x.check_out?new Date(x.check_out):now;
   const effectiveEnd=new Date(Math.min(actualEnd.getTime(),scheduledEnd.getTime()));
-
-  // Never count time before the scheduled shift starts.
-  if(now.getTime() < scheduledStart.getTime() && !x.check_out)return 0;
 
   return Math.max(0,Math.floor((effectiveEnd.getTime()-effectiveStart.getTime())/60000));
 }
@@ -161,6 +158,6 @@ setInterval(()=>{
     const d=document.getElementById("date").value||iraqDate();
     if(d===iraqDate()) load();
   }
-},5000);
+},1000);
 </script>
 </body></html>
