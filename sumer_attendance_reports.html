@@ -38,7 +38,13 @@ async function api(path){let r=await fetch(API+path,{headers:HEAD});let t=await 
 function iraqDate(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Baghdad",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())}
 function time(v){return v?new Date(v).toLocaleTimeString("ar-IQ",{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Baghdad"}):"—"}
 function duration(m){m=Number(m||0);return Math.floor(m/60)+"س "+(m%60)+"د"}
-function money(n){return Math.round(n).toLocaleString("ar-IQ")+" د.ع"}
+function money(n){return Math.round(Number(n)||0).toLocaleString("ar-IQ")+" د.ع"}
+function hourlyRate(x){
+ const raw=x?.employees?.hourly_rate;
+ if(raw===null||raw===undefined||raw==="")return 0;
+ const n=typeof raw==="number"?raw:Number(String(raw).replace(/[^0-9.-]/g,""));
+ return Number.isFinite(n)?n:0;
+}
 function parseShiftTime(value,fallback){
  const p=String(value||fallback).split(":").map(Number);
  return {h:Number.isFinite(p[0])?p[0]:0,m:Number.isFinite(p[1])?p[1]:0,s:Number.isFinite(p[2])?p[2]:0};
@@ -84,24 +90,40 @@ let reportData=[];
 function renderData(data){
  present.textContent=new Set(data.map(x=>x.employee_id)).size;
  records.textContent=data.length;
+
  const mins=data.reduce((s,x)=>s+liveMinutes(x),0);
  hours.textContent=duration(mins);
- const total=data.reduce((s,x)=>s+(liveMinutes(x)/60)*Number(x.employees?.hourly_rate||0),0);
+
+ const total=data.reduce((s,x)=>{
+   const minutes=liveMinutes(x);
+   const rate=hourlyRate(x);
+   return s+(minutes/60)*rate;
+ },0);
  pay.textContent=money(total);
+
  rows.innerHTML=data.map(x=>{
-   const m=liveMinutes(x),rate=Number(x.employees?.hourly_rate||0),p=(m/60)*rate;
+   const minutes=liveMinutes(x);
+   const rate=hourlyRate(x);
+   const wage=(minutes/60)*rate;
    const calcStart=calculationStart(x);
    const scheduledEnd=shiftEnd(x.employees||{},x.check_in,x.work_date);
    const actualEnd=x.check_out?new Date(x.check_out):new Date();
-   const capped=scheduledEnd && actualEnd.getTime()>scheduledEnd.getTime() && m>0;
+   const capped=scheduledEnd && actualEnd.getTime()>scheduledEnd.getTime() && minutes>0;
+
    return `<div class="row">
      <b>${x.employees?.full_name||"—"}</b>
      <span>${x.work_date}</span>
      <span>${time(x.check_in)}<small class="sub">البصمة الفعلية</small></span>
      <span>${time(x.check_out)}</span>
-     <span class="badge ${x.check_out?"ok":"open"}">${duration(m)}${x.check_out?"":" • مفتوح"}<small class="sub">بداية الحساب: ${time(calcStart)}</small></span>
+     <span class="badge ${x.check_out?"ok":"open"}">
+       ${duration(minutes)}${x.check_out?"":" • مفتوح"}
+       <small class="sub">بداية الحساب: ${time(calcStart)}</small>
+     </span>
      <span>${money(rate)}</span>
-     <b class="gold">${money(p)}<small class="sub">${capped?"متوقف عند نهاية الشفت":""}</small></b>
+     <b class="gold">
+       ${money(wage)}
+       <small class="sub">${capped?"متوقف عند نهاية الشفت":""}</small>
+     </b>
    </div>`;
  }).join("")||'<div class="empty">لا توجد سجلات حضور لهذا اليوم</div>';
 }
