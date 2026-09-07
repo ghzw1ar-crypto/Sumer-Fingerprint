@@ -21,14 +21,14 @@
 <div class="controls"><input id="date" class="control" type="date"><button class="btn" onclick="load()">تحديث التقرير</button><button class="btn" onclick="printReport()">🖨️ طباعة / PDF</button></div></header>
 <section class="cards">
 <div class="card"><div class="label">عدد الموظفين الحاضرين</div><div id="present" class="num green">0</div></div>
-<div class="card"><div class="label">إجمالي مدة الحضور الفعلية</div><div id="hours" class="num">0</div></div>
+<div class="card"><div class="label">إجمالي مدة الأجر</div><div id="hours" class="num">0</div></div>
 <div class="card"><div class="label">الأجر المستحق</div><div id="pay" class="num gold">0 د.ع</div></div>
 <div class="card"><div class="label">سجلات الدوام</div><div id="records" class="num">0</div></div>
 </section>
 <section class="card table"><div id="printTitle" style="margin-bottom:15px"><b>مطعم سومر — التقرير اليومي</b><div class="muted">تقرير حضور وانصراف الموظفين</div>
 <div class="muted" style="margin-top:6px">
-البصمة الفعلية محفوظة كما هي • مدة الحضور من البصمة الفعلية • الأجر يبدأ من بداية الشفت، ويتراكم أثناء الشفت، ويتوقف عند نهاية الشفت
-</div></div><div class="head"><span>الموظف</span><span>التاريخ</span><span>الدخول</span><span>الخروج</span><span>مدة الحضور</span><span>أجر الساعة</span><span>المستحق</span></div><div id="rows"></div></section>
+البصمة الفعلية محفوظة كما هي • الأجر يبدأ من بداية الشفت • يتوقف عند نهاية الشفت • قبل بداية الشفت = 0
+</div></div><div class="head"><span>الموظف</span><span>التاريخ</span><span>الدخول</span><span>الخروج</span><span>مدة الأجر</span><span>أجر الساعة</span><span>الأجر المستحق</span></div><div id="rows"></div></section>
 </div>
 <script src="sumer_auth.js"></script>
 <script>
@@ -71,6 +71,7 @@ function calculationStart(x){
   if(!x?.check_in)return null;
   return shiftStart(x.employees||{},x.work_date);
 }
+
 function calculationEnd(x){
   if(!x?.check_in)return null;
 
@@ -78,14 +79,15 @@ function calculationEnd(x){
   const scheduledEnd=shiftEnd(x.employees||{},x.check_in,x.work_date);
   const now=new Date();
 
-  // Wage starts at the scheduled shift start.
-  // Before shift start: 0.
-  // During shift: from shift start until now.
-  // After shift end: stop exactly at shift end.
-  if(now.getTime()<=scheduledStart.getTime()) return scheduledStart;
+  // لا يوجد أجر قبل بداية الشفت.
+  if(now.getTime() <= scheduledStart.getTime()){
+    return scheduledStart;
+  }
 
-  return new Date(Math.min(now.getTime(),scheduledEnd.getTime()));
+  // الأجر يتراكم من بداية الشفت إلى الوقت الحالي، ويتوقف عند نهاية الشفت.
+  return new Date(Math.min(now.getTime(), scheduledEnd.getTime()));
 }
+
 function liveMinutes(x){
  const start=calculationStart(x),end=calculationEnd(x);
  if(!start||!end||end.getTime()<=start.getTime())return 0;
@@ -112,7 +114,7 @@ function renderData(data){
    const wage=(minutes/60)*rate;
    const calcStart=calculationStart(x);
    const scheduledEnd=shiftEnd(x.employees||{},x.check_in,x.work_date);
-   const actualEnd=x.check_out?new Date(x.check_out):new Date();
+   const actualEnd=new Date();
    const capped=scheduledEnd && actualEnd.getTime()>scheduledEnd.getTime() && minutes>0;
 
    return `<div class="row">
