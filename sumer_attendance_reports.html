@@ -49,45 +49,59 @@ function parseShiftTime(value,fallback){
  const p=String(value||fallback).split(":").map(Number);
  return {h:Number.isFinite(p[0])?p[0]:0,m:Number.isFinite(p[1])?p[1]:0,s:Number.isFinite(p[2])?p[2]:0};
 }
-function iraqDateTime(date,timeValue){
+function parseShiftTime(value,fallback){
+ const p=String(value||fallback).split(":").map(Number);
+ return {h:Number.isFinite(p[0])?p[0]:0,m:Number.isFinite(p[1])?p[1]:0,s:Number.isFinite(p[2])?p[2]:0};
+}
+function iraqNowParts(){
+ const parts=new Intl.DateTimeFormat("en-CA",{
+   timeZone:"Asia/Baghdad",year:"numeric",month:"2-digit",day:"2-digit",
+   hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"
+ }).formatToParts(new Date());
+ const o={}; for(const x of parts) o[x.type]=x.value;
+ return {date:`${o.year}-${o.month}-${o.day}`,h:+o.hour,m:+o.minute,s:+o.second};
+}
+function workDateNowIraq(){
+ const n=iraqNowParts();
+ if(n.h<4){
+   const d=new Date(Date.UTC(+n.date.slice(0,4),+n.date.slice(5,7)-1,+n.date.slice(8,10)-1));
+   d.setUTCDate(d.getUTCDate()-1);
+   return d.toISOString().slice(0,10);
+ }
+ return n.date;
+}
+// Converts an Iraq wall-clock date/time to an absolute timestamp without relying
+// on the browser's local timezone.
+function iraqWallMs(date,timeValue){
  const t=parseShiftTime(timeValue,"07:00:00");
- return new Date(`${date}T${String(t.h).padStart(2,"0")}:${String(t.m).padStart(2,"0")}:${String(t.s).padStart(2,"0")}+03:00`);
+ const y=+date.slice(0,4), m=+date.slice(5,7)-1, d=+date.slice(8,10);
+ return Date.UTC(y,m,d,t.h,t.m,t.s)-3*60*60*1000;
 }
 function shiftStart(e,workDate){
- return iraqDateTime(workDate,e?.shift_start||"07:00:00");
+ return new Date(iraqWallMs(workDate,e?.shift_start||"07:00:00"));
 }
 function shiftEnd(e,checkIn,workDate){
  const start=parseShiftTime(e?.shift_start,"07:00:00");
  const end=parseShiftTime(e?.shift_end,"15:00:00");
- let endDate=workDate||iraqDate();
- if((end.h*60+end.m+end.s)<=(start.h*60+start.m+start.s)){
-   const d=iraqDateTime(endDate,"00:00:00");
-   d.setUTCDate(d.getUTCDate()+1);
-   endDate=d.toISOString().slice(0,10);
- }
- return iraqDateTime(endDate,`${end.h}:${end.m}:${end.s}`);
+ let endMs=iraqWallMs(workDate,`${end.h}:${end.m}:${end.s}`);
+ if((end.h*3600+end.m*60+end.s)<=(start.h*3600+start.m*60+start.s)) endMs+=24*60*60*1000;
+ return new Date(endMs);
 }
 function calculationStart(x){
-  if(!x?.check_in)return null;
-  return shiftStart(x.employees||{},x.work_date);
+ if(!x?.check_in||!x?.work_date)return null;
+ return shiftStart(x.employees||{},x.work_date);
 }
-
 function calculationEnd(x){
-  if(!x?.check_in)return null;
-
-  const scheduledStart=shiftStart(x.employees||{},x.work_date);
-  const scheduledEnd=shiftEnd(x.employees||{},x.check_in,x.work_date);
-  const now=new Date();
-
-  // لا يوجد أجر قبل بداية الشفت.
-  if(now.getTime() <= scheduledStart.getTime()){
-    return scheduledStart;
-  }
-
-  // الأجر يتراكم من بداية الشفت إلى الوقت الحالي، ويتوقف عند نهاية الشفت.
-  return new Date(Math.min(now.getTime(), scheduledEnd.getTime()));
+ if(!x?.check_in||!x?.work_date)return null;
+ const start=calculationStart(x);
+ const end=shiftEnd(x.employees||{},x.check_in,x.work_date);
+ const todayWorkDate=workDateNowIraq();
+ if(x.work_date<todayWorkDate) return end;
+ if(x.work_date>todayWorkDate) return start;
+ const n=new Date();
+ if(n.getTime()<=start.getTime()) return start;
+ return new Date(Math.min(n.getTime(),end.getTime()));
 }
-
 function liveMinutes(x){
  const start=calculationStart(x),end=calculationEnd(x);
  if(!start||!end||end.getTime()<=start.getTime())return 0;
@@ -153,8 +167,16 @@ function printReport(){
 }
 date.value=iraqDate();
 load();
-// تحديث العداد والأجر كل ثانية محلياً، بدون إعادة طلب البيانات.
+
+// تحديث العداد والأجر كل ثانية، اعتماداً على الوقت الحالي الحقيقي.
 setInterval(()=>{
- if(document.visibilityState!=="hidden" && reportData.length) renderData(reportData);
+  if(document.visibilityState!=="hidden") {
+    renderData(reportData);
+  }
 },1000);
+
+// إعادة جلب بيانات Supabase كل 5 ثواني حتى تظهر أي بصمة جديدة مباشرة.
+setInterval(()=>{
+  if(document.visibilityState!=="hidden") load();
+},5000);
 </script></body></html>
